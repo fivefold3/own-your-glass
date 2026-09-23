@@ -1,0 +1,105 @@
+/* Own Your Glass — webOS (Sandstone-like) styling.
+   Near-black background, LG Smart UI type, pill buttons that turn light on
+   focus and scale a touch, list items with toggle switches, gentle motion.
+   1080p canvas; every target >= 60px tall; text >= 27px. */
+:root{
+  --bg:#000; --bg-2:#111; --panel:#1b1b1b;
+  --text:#e6e6e6; --muted:#a6a6a6; --dim:#6f6f6f;
+  --btn:#4a4a4a; --btn-focus:#e6e6e6; --btn-focus-text:#000;
+  --line:#2e2e2e; --amber:#e0a33e; --good:#63d38b; --bad:#ff6b5e;
+  --ease:cubic-bezier(.2,.7,.2,1);
+}
+*{margin:0;padding:0;box-sizing:border-box}
+html,body{height:100%;overflow:hidden;background:var(--bg);color:var(--text);
+  font-family:"LG Smart UI","Helvetica Neue",Arial,sans-serif;font-size:30px;line-height:1.35;font-weight:400;-webkit-user-select:none;cursor:none}
+.app{position:relative;height:100%;overflow:hidden;background:radial-gradient(120% 90% at 50% 0%,#151515 0%,#000 70%)}
+.screen{position:absolute;inset:0;display:flex;flex-direction:column;padding:0 72px}
+.screen[hidden]{display:none}
+.bar{display:flex;align-items:center;gap:22px;height:120px;flex-shrink:0}
+.brand{font-size:36px;font-weight:600;letter-spacing:.01em}
+.device{margin-left:auto;font-size:24px;color:var(--dim)}
+.bar .back{font-size:52px;line-height:1;color:var(--muted);margin-right:-6px}
+.bar .title{font-size:40px;font-weight:600}
+.bar .hint{margin-left:auto;font-size:24px;color:var(--muted)}
+
+/* ---- main ---- */
+.hero{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:30px;padding-bottom:60px}
+.glass{width:300px;height:300px}
+.eye-svg{width:100%;height:100%;overflow:visible}
+.eye-svg .tv{fill:none;stroke:var(--amber);stroke-width:6;stroke-linecap:round}
+.eye-svg .lid{fill:none;stroke:var(--text);stroke-width:5;stroke-linejoin:round}
+.eye-svg .iris{fill:var(--text)}
+.eye-svg .mic{fill:#000} .eye-svg .mic-line{fill:none;stroke:#000;stroke-width:2.4;stroke-linecap:round}
+.eye-svg .closed path{fill:none;stroke:var(--text);stroke-width:5;stroke-linecap:round}
+.eye-svg .closed{opacity:0}
+/* owned by you: the open eye is swapped for the closed one, no motion */
+.glass.owned .inner,.glass.owned .lid{display:none}
+.glass.owned .closed{opacity:1}
+.status{text-align:center}
+.status .label{font-size:26px;color:var(--muted);letter-spacing:.06em;text-transform:uppercase}
+.status .owner{font-size:64px;font-weight:600;line-height:1.15;margin-top:4px;transition:color .3s}
+.status .owner.you{color:var(--text)} .status .owner.lg{color:var(--text)}
+.status .detail{font-size:28px;color:var(--muted);margin-top:8px;min-height:38px}
+.actions{display:flex;gap:24px;margin-top:10px}
+
+/* ---- pill buttons (Sandstone-like) ---- */
+.pill{font-family:inherit;font-size:30px;font-weight:600;color:var(--text);background:var(--btn);border:0;border-radius:999px;
+  min-height:78px;min-width:300px;padding:0 48px;transition:transform .18s var(--ease),background .18s,color .18s,box-shadow .18s}
+.pill.primary{background:#5a5a5a}
+.pill.focus{background:var(--btn-focus);color:var(--btn-focus-text);transform:scale(1.06);box-shadow:0 10px 40px rgba(0,0,0,.6)}
+.pill[disabled]{opacity:.4}
+.pill.hidden{display:none}
+
+/* ---- settings list ---- */
+.list{flex:1;overflow:auto;padding:6px 0 60px;-webkit-mask-image:linear-gradient(#000 92%,transparent)}
+.section{font-size:24px;color:var(--dim);letter-spacing:.06em;text-transform:uppercase;padding:34px 24px 10px}
+.item{display:flex;align-items:center;gap:26px;min-height:96px;padding:12px 26px;border-radius:24px;
+  transition:background .15s,transform .18s var(--ease)}
+.item .text{flex:1;min-width:0}
+.item .name{font-size:32px;font-weight:500;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.item .desc{font-size:24px;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.item .breaks{font-size:22px;color:var(--amber);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.item.focus .breaks{color:#8a5a0a}
+.item .state{font-size:24px;color:var(--muted);white-space:nowrap}
+.item.ok .state{color:var(--good)} .item.fail .state,.item.warn .state{color:var(--bad)} .item.pendingchange .state{color:var(--amber)}
+.item.focus{background:var(--btn-focus);color:var(--btn-focus-text);transform:scale(1.015)}
+.item.focus .desc,.item.focus .state{color:#3a3a3a}
+.item.focus.ok .state{color:#1f7a3f} .item.focus.fail .state,.item.focus.warn .state{color:#b0341f} .item.focus.pendingchange .state{color:#8a5a0a}
+.item.danger .name{color:var(--bad)} .item.focus.danger .name{color:#b0341f}
+.item .chev{font-size:40px;color:var(--dim)} .item.focus .chev{color:#3a3a3a}
+/* toggle switch */
+.toggle{width:96px;height:52px;border-radius:26px;background:#3a3a3a;position:relative;flex-shrink:0;transition:background .2s}
+.toggle::after{content:"";position:absolute;top:6px;left:6px;width:40px;height:40px;border-radius:50%;background:#bdbdbd;transition:transform .2s var(--ease),background .2s}
+.toggle.on{background:var(--good)} .toggle.on::after{transform:translateX(44px);background:#fff}
+.toggle.pending{background:var(--amber)}
+.item.focus .toggle{background:#bdbdbd} .item.focus .toggle.on{background:#2fa85e} .item.focus .toggle.pending{background:#c98a1e}
+.item.focus .toggle::after{background:#fff}
+
+/* ---- log ---- */
+.log{flex:1;overflow:auto;font:400 24px/1.5 Menlo,"LG Smart UI Mono",monospace;color:#cfcfcf;white-space:pre-wrap;padding:10px 24px 60px}
+.log .ok{color:var(--good)} .log .fail{color:var(--bad)} .log .warn{color:var(--amber)} .log .head{color:#fff;font-weight:700;margin-top:10px}
+
+/* ---- job overlay ---- */
+.job{position:absolute;inset:0;background:rgba(0,0,0,.78);display:flex;align-items:center;justify-content:center;z-index:5;animation:fade .25s both}
+.job[hidden]{display:none}
+.job-box{text-align:center;max-width:1300px}
+.spinner{width:84px;height:84px;border-radius:50%;border:8px solid #333;border-top-color:var(--text);margin:0 auto 28px;animation:spin 1s linear infinite}
+.job-title{font-size:44px;font-weight:600}
+.job-line{font-size:26px;color:var(--muted);margin-top:14px;min-height:36px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+
+/* ---- exit dialog ---- */
+.modal{position:absolute;inset:0;background:rgba(0,0,0,.75);display:flex;align-items:center;justify-content:center;z-index:10;animation:fade .2s both}
+.modal[hidden]{display:none}
+.modal .box{background:var(--panel);border-radius:36px;padding:56px 64px;min-width:820px;text-align:center;animation:fadeUp .25s var(--ease) both}
+.mtitle{font-size:40px;font-weight:600;margin-bottom:10px}
+.mtext{font-size:26px;color:var(--muted);margin-bottom:36px}
+.mbtns{display:flex;gap:22px;justify-content:center}
+.mbtns .pill{min-width:240px}
+
+/* ---- motion ---- */
+.panel{animation:slideIn .32s var(--ease) both}
+@keyframes slideIn{from{opacity:0;transform:translateX(60px)}to{opacity:1;transform:none}}
+@keyframes fadeUp{from{opacity:0;transform:translateY(16px)}to{opacity:1;transform:none}}
+@keyframes fade{from{opacity:0}to{opacity:1}}
+@keyframes spin{to{transform:rotate(360deg)}}
+@media (prefers-reduced-motion: reduce){*{animation:none!important;transition:none!important}}

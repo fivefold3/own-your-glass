@@ -1,0 +1,36 @@
+name: build ipk
+
+on:
+  push:
+    branches: [main]
+    tags: ['v*']
+  pull_request:
+
+permissions:
+  contents: write   # the release step attaches the ipk and manifest to the tag's release
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: shell syntax check
+        run: |
+          for f in toolkit/oyg toolkit/boot-hook toolkit/lib/*.sh toolkit/modules/*.sh tools/*.sh; do sh -n "$f"; done
+      - name: shellcheck
+        run: |
+          sudo apt-get install -y -q shellcheck >/dev/null
+          shellcheck -s sh -S warning -e SC2034,SC2039,SC3043,SC2086,SC2046,SC1090,SC1091,SC2154 toolkit/oyg toolkit/lib/*.sh toolkit/modules/*.sh || true
+      - name: build
+        run: tools/build-ipk.sh
+      - uses: actions/upload-artifact@v4
+        with:
+          name: ipk
+          path: dist/
+      - name: release
+        if: startsWith(github.ref, 'refs/tags/v')
+        uses: softprops/action-gh-release@v2
+        with:
+          files: |
+            dist/*.ipk
+            dist/org.ownyourglass.app.manifest.json

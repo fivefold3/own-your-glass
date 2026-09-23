@@ -1,0 +1,234 @@
+#!/bin/sh
+# oyg — own-your-glass command line. Runs as root on a rooted LG webOS TV.
+#
+#   oyg status            machine-readable status (fast; safe to poll)
+#   oyg list              modules, defaults, what is enabled
+#   oyg apply [mod...]    apply the enabled modules (or the named ones, enabling them)
+#   oyg restore [mod...]  undo the named modules (default: all)
+#   oyg sync mod=on mod=off ...   turn modules on (enable + apply) or off (restore + disable)
+#   oyg enable  mod...    enable + apply
+#   oyg disable mod...    restore + disable
+#   oyg install           copy the toolkit to /var/lib/own-your-glass, drop the boot hook
+#   oyg uninstall [--remove-app]   undo everything, remove hook + state (+ the app)
+#   oyg persist on|off    re-apply on every boot (default ON, with a crash-loop breaker)
+#   oyg purge [--web-cookies]   delete collected ad/diagnostic/voice data, reset the advertising ID
+#   oyg boot              what the boot hook runs
+#   oyg log               the last 200 log lines
+#
+#   OYG_DRYRUN=1  prints what would change without changing it.
+set -u
+if [ -z "${OYG_BUNDLED:-}" ]; then
+    OYG_TK=$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)
+    . "$OYG_TK/lib/common.sh"
+    . "$OYG_TK/lib/svc.sh"
+    . "$OYG_TK/lib/purge.sh"
+    for m in "$OYG_TK"/modules/*.sh; do . "$m"; done
+else
+    OYG_TK=${OYG_TK:-/nonexistent}   # single-file bundle (tools/bundle.sh): everything is inline
+fi
+
+MODULES="nag acr telemetry remote voice mic capture consent apps cloud network"   # nag first: it races eula-service at boot
+ENABLED_FILE="$OYG_ROOT/enabled"
+NOPERSIST_FILE="$OYG_ROOT/nopersist"      # exists = do NOT re-apply at boot (default is to re-apply)
+BOOT_MARK="$OYG_ROOT/boot.unconfirmed"    # exists at boot = last boot-apply was never confirmed
+persist_on() { [ ! -f "$NOPERSIST_FILE" ]; }
+
+upper() { printf '%s' "$1" | tr 'a-z' 'A-Z'; }
+mod_desc()    { eval "printf '%s' \"\$MOD_$(upper "$1")_DESC\""; }
+mod_default() { eval "printf '%s' \"\$MOD_$(upper "$1")_DEFAULT\""; }
+mod_breaks()  { eval "printf '%s' \"\${MOD_$(upper "$1")_BREAKS:-}\""; }
+is_module()   { case " $MODULES " in *" $1 "*) return 0;; *) return 1;; esac; }
+# Until the first apply writes the enabled file, the defaults are the plan.
+default_list(){ for m in $MODULES; do [ "$(mod_default "$m")" = on ] && printf '%s\n' "$m"; done; }
+enabled_list(){ if [ -f "$ENABLED_FILE" ]; then cat "$ENABLED_FILE"; else default_list; fi; }
+enabled()     { enabled_list | grep -qx "$1"; }
+set_enabled() {  # set_enabled mod on|off
+    [ "$OYG_DRYRUN" = 1 ] && return 0
+    mkdir -p "$OYG_ROOT"
+    { grep -vx "$1" "$ENABLED_FILE" 2>/dev/null; [ "$2" = on ] && printf '%s\n' "$1"; } > "$ENABLED_FILE.tmp"
+    mv "$ENABLED_FILE.tmp" "$ENABLED_FILE"
+}
+need_root() { [ "$(id -u)" = 0 ] || [ "$OYG_DRYRUN" = 1 ] || die "must run as root"; }
+
+# ------------------------------------------------------------- install --
+# The toolkit is copied out of the app directory so that the boot hook can
+# still restore the TV after the app has been uninstalled.
+installed_version() { sed -n 's/^OYG_VERSION="\(.*\)"/\1/p' "$OYG_ROOT/toolkit/lib/common.sh" 2>/dev/null; }
+do_install() {
+    need_root; oyg_init_dirs
+    [ "$OYG_DRYRUN" = 1 ] && { info "(dry-run) install toolkit to $OYG_ROOT"; return 0; }
+    if [ "$OYG_TK" != "$OYG_ROOT/toolkit" ]; then
+        rm -rf "$OYG_ROOT/toolkit.new" && cp -R "$OYG_TK" "$OYG_ROOT/toolkit.new" \
+            && rm -rf "$OYG_ROOT/toolkit" && mv "$OYG_ROOT/toolkit.new" "$OYG_ROOT/toolkit" || die "could not copy toolkit"
+        chmod 755 "$OYG_ROOT/toolkit/oyg" "$OYG_ROOT/toolkit/boot-hook"
+    fi
+    [ -f "$ENABLED_FILE" ] || default_list > "$ENABLED_FILE"
+    rm -f "$OYG_ROOT/persist"    # pre-1.1.1 opt-in flag; persistence is now the default
+    mkdir -p "$(dirname "$OYG_HOOK")"
+    cp "$OYG_ROOT/toolkit/boot-hook" "$OYG_HOOK" && chmod 755 "$OYG_HOOK"
+    ok "toolkit $OYG_VERSION installed at $OYG_ROOT, boot hook at $OYG_HOOK"
+}
+ensure_installed() {
+    if [ ! -x "$OYG_ROOT/toolkit/oyg" ] || [ "$(installed_version)" != "$OYG_VERSION" ] || [ ! -x "$OYG_HOOK" ]; then do_install; fi
+}
+
+# --------------------------------------------------------- apply/restore --
+apply_mod() {
+    is_module "$1" || { warn "unknown module $1"; return 1; }
+    head_ "$1: $(mod_desc "$1")"
+    OYG_MOD=$1; oyg_init_dirs
+    "mod_${1}_apply"; _rc=$?
+    OYG_MOD=core
+    return $_rc
+}
+restore_mod() {
+    is_module "$1" || { warn "unknown module $1"; return 1; }
+    head_ "$1: restoring"
+    OYG_MOD=$1
+    "mod_${1}_restore"; _rc=$?
+    OYG_MOD=core
+    return $_rc
+}
+do_apply() {
+    need_root; ensure_installed
+    if [ $# -gt 0 ]; then for m in "$@"; do is_module "$m" && set_enabled "$m" on; done; fi
+    _list=${*:-$(enabled_list)}
+    [ -n "$_list" ] || { info "no modules enabled"; return 0; }
+    _fail=0
+    for m in $_list; do apply_mod "$m" || _fail=1; done
+    head_ "done"
+    if [ "${OYG_QUIET_TOAST:-0}" != 1 ]; then
+        [ $_fail = 0 ] && toast "Own Your Glass: the glass is yours" || toast "Own Your Glass: applied with warnings, check the log"
+    fi
+    return $_fail
+}
+do_restore() {
+    need_root
+    _list=${*:-$MODULES}
+    for m in $_list; do restore_mod "$m"; done
+    head_ "restored: $_list"
+}
+
+# ---------------------------------------------------------------- status --
+do_status() {
+    printf 'META|version|%s\n' "$OYG_VERSION"
+    printf 'META|installed|%s\n' "$( [ "$(installed_version)" = "$OYG_VERSION" ] && echo 1 || echo 0)"
+    printf 'META|hook|%s\n' "$( [ -x "$OYG_HOOK" ] && echo 1 || echo 0)"
+    printf 'META|model|%s\n' "$(model_name)"
+    printf 'META|webos|%s\n' "$(webos_version)"
+    printf 'META|enabled|%s\n' "$(enabled_list | tr '\n' ' ')"
+    printf 'META|persist|%s\n' "$(persist_on && echo 1 || echo 0)"
+    _ap=0; for m in $MODULES; do OYG_MOD=$m; [ "$(kv_get applied)" = 1 ] && _ap=$((_ap+1)); done; OYG_MOD=core
+    printf 'META|applied|%s\n' "$_ap"
+    # a successful status read from the app counts as "the TV came up fine"
+    [ -f "$BOOT_MARK" ] && [ "$(id -u)" = 0 ] && rm -f "$BOOT_MARK"
+    _rc=0
+    for m in $MODULES; do
+        OYG_MOD=$m
+        printf 'MOD|%s|%s|%s|%s|%s\n' "$m" "$(enabled "$m" && echo on || echo off)" "$( [ "$(kv_get applied)" = 1 ] && echo 1 || echo 0)" "$(mod_desc "$m")" "$(mod_breaks "$m")"
+        if enabled "$m"; then "mod_${m}_status" || _rc=1
+        else
+            # show whether anything of ours is still in place for a disabled module
+            [ -n "$(state_list mounts)$(state_list files)$(kv_get applied)" ] && st "$(upper "$m")" WARN "disabled but changes still applied (run restore)"
+            st "$(upper "$m")" OFF "not enabled"
+        fi
+        OYG_MOD=core
+    done
+    return $_rc
+}
+do_list() {
+    printf '%-10s %-8s %-3s %s\n' MODULE DEFAULT ON DESCRIPTION
+    for m in $MODULES; do printf '%-10s %-8s %-3s %s\n' "$m" "$(mod_default "$m")" "$(enabled "$m" && echo yes || echo no)" "$(mod_desc "$m")"; done
+}
+
+# ------------------------------------------------------------------ boot --
+do_boot() {
+    need_root
+    head_ "boot: own-your-glass $OYG_VERSION on $(model_name)"
+    if ! app_installed; then
+        head_ "app is gone: restoring the TV and removing myself"
+        do_restore
+        [ "$OYG_DRYRUN" = 1 ] || { rm -f "$OYG_HOOK"; rm -rf "$OYG_ROOT"; }
+        return 0
+    fi
+    # Re-apply at boot unless the owner turned it off (oyg persist off) or the
+    # crash-loop breaker below did. Binds and stopped services never survive
+    # a reboot, so with persistence off a reboot brings the stock TV back.
+    if ! persist_on; then
+        info "persistence is off: nothing applied (open the app and press Apply)"
+        return 0
+    fi
+    # Crash-loop breaker: the marker is written before applying and removed
+    # only once the TV has been up for a while (or the app read the status).
+    # If it is still there at the next boot, the last boot never got that far,
+    # so persistence is switched off and nothing is applied.
+    if [ -f "$BOOT_MARK" ]; then
+        rm -f "$BOOT_MARK"; : > "$NOPERSIST_FILE"
+        warn "previous boot did not complete after applying: persistence disabled, nothing applied"
+        toast "Own Your Glass: last boot was not confirmed, hardening left OFF"
+        return 0
+    fi
+    : > "$BOOT_MARK"
+    OYG_QUIET_TOAST=1 do_apply; _rc=$?
+    _n=$(enabled_list | grep -c .)
+    ( if [ $_rc = 0 ]; then toast_after_boot "Own Your Glass: $_n protections re-applied at boot"; else toast_after_boot "Own Your Glass: re-applied at boot with warnings, check the log"; fi ) </dev/null >/dev/null 2>&1 &
+    ( sleep 300; rm -f "$BOOT_MARK"
+      sleep 60; for m in $(enabled_list); do case $m in acr|telemetry|consent|voice|cloud|nag) apply_mod "$m" >/dev/null 2>&1;; esac; done
+    ) </dev/null >/dev/null 2>&1 &
+}
+do_persist() {
+    need_root; ensure_installed
+    case ${1:-} in
+        on)  [ "$OYG_DRYRUN" = 1 ] || rm -f "$NOPERSIST_FILE"; ok "hardening will be re-applied on every boot (crash-loop breaker armed)" ;;
+        off) [ "$OYG_DRYRUN" = 1 ] || { : > "$NOPERSIST_FILE"; rm -f "$BOOT_MARK"; }; ok "a reboot now brings the stock TV back; press Apply after each boot" ;;
+        *)   persist_on && echo on || echo off ;;
+    esac
+}
+
+# ------------------------------------------------------------- uninstall --
+do_uninstall() {
+    need_root
+    _rm=0; [ "${1:-}" = "--remove-app" ] && _rm=1
+    if [ "$OYG_DRYRUN" = 1 ]; then do_restore; info "(dry-run) remove $OYG_HOOK $OYG_ROOT"; return 0; fi
+    # run from a scratch copy: the directory we are executing from goes away
+    rm -rf /tmp/oyg-uninstall && cp -R "$OYG_TK" /tmp/oyg-uninstall || die "cannot stage uninstall"
+    exec sh /tmp/oyg-uninstall/oyg _uninstall2 "$_rm"
+}
+do_uninstall2() {
+    do_restore
+    rm -f "$OYG_HOOK"; rm -rf "$OYG_ROOT"
+    head_ "own-your-glass removed from $OYG_ROOT"
+    if [ "$1" = 1 ]; then
+        toast "Own Your Glass: TV restored, removing app"
+        luna luna://com.webos.appInstallService/dev/remove "{\"id\":\"$OYG_APPID\",\"subscribe\":false}" >/dev/null
+        head_ "app removal requested"
+    fi
+    rm -rf /tmp/oyg-uninstall
+}
+
+# ------------------------------------------------------------------ main --
+cmd=${1:-status}; [ $# -gt 0 ] && shift
+[ "$OYG_DRYRUN" = 1 ] || rotate_logs
+case $cmd in
+    status)     do_status || : ;;   # levels are in the output; a non-zero exit would make the root service drop it
+    list)       do_list ;;
+    apply)      oyg_lock; do_apply "$@" ;;
+    restore)    oyg_lock; do_restore "$@" ;;
+    enable)     for m in "$@"; do is_module "$m" || die "unknown module $m"; done; oyg_lock; do_apply "$@" ;;
+    disable)    need_root; for m in "$@"; do is_module "$m" || die "unknown module $m"; done; oyg_lock; for m in "$@"; do restore_mod "$m"; set_enabled "$m" off; done ;;
+    install)    do_install ;;
+    uninstall)  do_uninstall "$@" ;;
+    _uninstall2) do_uninstall2 "$@" ;;
+    sync)       need_root; oyg_lock; ensure_installed
+                for a in "$@"; do m=${a%%=*}; v=${a#*=}; is_module "$m" || die "unknown module $m"
+                    case $v in on)  set_enabled "$m" on; apply_mod "$m" ;;
+                                off) restore_mod "$m"; set_enabled "$m" off ;;
+                                *) die "use $m=on or $m=off" ;; esac
+                done; head_ "synced" ;;
+    boot)       oyg_lock; do_boot ;;
+    persist)    do_persist "$@" ;;
+    purge)      oyg_lock; do_purge "$@" ;;
+    log)        tail -n 200 "$OYG_LOG" 2>/dev/null ;;
+    version)    echo "$OYG_VERSION" ;;
+    *)          sed -n '2,20p' "$0"; exit 2 ;;
+esac

@@ -1,0 +1,97 @@
+# own-your-glass hostname sinkhole list. One hostname per line, '#' comments.
+# Exact hostnames only (/etc/hosts cannot express suffixes).
+#
+# NOT in this list on purpose:
+#   *.nextlgsdp.com / *.lgtvsdp.com apexes  — LG's time sync rides on them;
+#       blocking broke TLS on the reference device (clock fell back to 2021)
+#   snu/su.lge.com firmware servers         — Homebrew Channel's own
+#       "block updates" toggle covers those, and it is the owner's call
+#   ThinQ / voice / app-store hostnames     — feature-breaking; the cloud
+#       module stops those daemons at the source instead
+#   *ngfts.lge.com                          — LG first-time-setup provisioning;
+#       the terms-and-conditions UI loads from it and shows "system error"
+#       when it is sinkholed
+
+# --- LG advertising / ACR ---
+ads.lgtvcommon.com
+aic.ads.lgtvcommon.com
+ad.lgappstv.com
+lgsmartad.com
+info.lgsmartad.com
+de.info.lgsmartad.com
+smart.adtvc.app
+adsdtvc.com
+de.emp.lgsmartplatform.com
+initscr.lge.com
+
+# --- LG telemetry / beacons / promo cards ---
+cdpbeacon.lgtvcommon.com
+homeprv.lgtvcommon.com
+recommend.lgtvcommon.com
+nudge.lgtvcommon.com
+eic.nudge.lgtvcommon.com
+eic.wiseconfig.lgtvcommon.com
+eic.lab.lgtvcommon.com
+pnv.lgtvcommon.com
+qcardservice.lgtvcommon.com
+eic.lgtviot.com
+eic.api.lgtviot.com
+eic.tv.wiselg.com
+rdx2.nextlgsdp.com
+ibs.nextlgsdp.com
+ibsstat.nextlgsdp.com
+lggalleryplus.com
+cf-kic.lggalleryplus.com
+
+# --- ACR vendors ---
+alphonso.tv
+cdn-aas-campaigns.alphonso.tv
+konograma.com
+marker.konograma.com
+marker2.konograma.com
+
+# --- ad-tech seen on the wire from a TV with every consent declined ---
+demdex.net
+dpm.demdex.net
+everesttech.net
+criteo.com
+doubleclick.net
+sxp.smartclip.net
+hbbtv.smartclip.net
+es.container.enhanced.live
+bitv.eu
+ottera.tv
+stream.ads.ottera.tv
+otteravision.com
+lge-oo-es.otteravision.com
+adstk.io
+eu-ssp-pix.adstk.io
+eu-imp-pix.adstk.io
+smartadserver.com
+prg.smartadserver.com
+axiom.co
+api.axiom.co
+ipify.org
+api.ipify.org
+onetrust.io
+mobile-data.onetrust.io
+googletagmanager.com
+www.googletagmanager.com
+
+# --- Alexa captive-portal probes ---
+avsxappcaptiveportal.com
+
+# --- public DNS-over-HTTPS endpoints (stop apps sidestepping the sinkhole) ---
+dns.google
+dns.google.com
+cloudflare-dns.com
+mozilla.cloudflare-dns.com
+chrome.cloudflare-dns.com
+one.one.one.one
+dns.quad9.net
+dns9.quad9.net
+doh.opendns.com
+dns.adguard.com
+dns.adguard-dns.com
+doh.cleanbrowsing.org
+dns.nextdns.io

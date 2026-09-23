@@ -1,0 +1,17 @@
+# build output
+dist/
+
+# macOS
+.DS_Store
+._*
+
+# editors
+.vscode/
+.idea/
+*.swp
+*~
+
+# local-only
+scratchpad*
+.claude/settings.local.json
+*.log

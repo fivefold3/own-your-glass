@@ -1,0 +1,27 @@
+{
+  "id": "org.ownyourglass.app",
+  "type": "web",
+  "main": "index.html",
+  "title": "Own Your Glass",
+  "vendor": "own-your-glass",
+  "version": "1.2.3",
+  "appDescription": "Privacy hardening for rooted LG webOS TVs. Stops ACR, ad overlays, telemetry uploaders, remote-support and voice pipelines at the source. Fully reversible: undo everything from the app, or just uninstall it.",
+  "icon": "icon.png",
+  "largeIcon": "largeIcon.png",
+  "bgColor": "#14120f",
+  "iconColor": "#e0a33e",
+  "transparent": false,
+  "defaultWindowType": "card",
+  "handlesRelaunch": false,
+  "disableBackHistoryAPI": true,
+  "supportQuickStart": false,
+  "inspectable": true,
+  "requiredPermissions": [
+    "applications",
+    "applications.internal",
+    "settings",
+    "system",
+    "database",
+    "database.internal"
+  ]
+}

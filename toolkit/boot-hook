@@ -1,0 +1,12 @@
+#!/bin/sh
+# own-your-glass boot hook. Homebrew Channel runs everything in
+# /var/lib/webosbrew/init.d as root at boot (run-parts: no dot in the name).
+# If the app has been uninstalled, `oyg boot` restores the TV and removes
+# this hook and its state; otherwise it re-applies the enabled modules.
+R=/var/lib/own-your-glass
+[ -x "$R/toolkit/oyg" ] || exit 0
+mkdir -p "$R"
+# Detached, so Homebrew Channel's startup never waits on us and a hang here
+# cannot delay the boot.
+nohup sh "$R/toolkit/oyg" boot >> "$R/boot.log" 2>&1 </dev/null &
+exit 0

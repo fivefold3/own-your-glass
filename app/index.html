@@ -1,0 +1,81 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Own Your Glass</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<div class="app" id="app">
+
+  <!-- ===== main: status + one action ===== -->
+  <section class="screen main" id="screen-main">
+    <header class="bar"><span class="brand">Own Your Glass</span><span class="device" id="device"></span></header>
+    <div class="hero">
+      <div class="glass" id="glass">
+        <svg viewBox="0 0 130 130" class="eye-svg" aria-hidden="true">
+          <rect x="17" y="24" width="96" height="66" rx="9" class="tv"/>
+          <path d="M52 100 h26 M65 90 v10" class="tv"/>
+          <g class="eye">
+            <path d="M33 57 Q65 30 97 57 Q65 84 33 57 Z" class="lid"/>
+            <g class="inner">
+              <circle cx="65" cy="57" r="15" class="iris"/>
+              <rect x="61" y="46" width="8" height="14" rx="4" class="mic"/>
+              <path d="M58 56 a7 7 0 0 0 14 0" class="mic-line"/>
+              <path d="M65 63 v4 M61.5 67 h7" class="mic-line"/>
+            </g>
+            <g class="closed">
+              <path d="M33 57 Q65 84 97 57"/>
+              <path d="M45 66 l-4 9 M57 71 l-2 10 M73 71 l2 10 M85 66 l4 9"/>
+            </g>
+          </g>
+        </svg>
+      </div>
+      <div class="status">
+        <div class="owner" id="owner">Checking&hellip;</div>
+        <div class="detail" id="detail"></div>
+      </div>
+      <div class="actions" id="main-actions">
+        <button class="pill primary" data-act="own">Own the glass</button>
+        <button class="pill" data-act="settings">Settings</button>
+      </div>
+    </div>
+  </section>
+
+  <!-- ===== settings ===== -->
+  <section class="screen panel" id="screen-settings" hidden>
+    <header class="bar"><span class="back" aria-hidden="true">&#8249;</span><span class="title">Settings</span><span class="hint" id="settings-hint"></span></header>
+    <div class="list" id="settings-list"></div>
+  </section>
+
+  <!-- ===== log ===== -->
+  <section class="screen panel" id="screen-log" hidden>
+    <header class="bar"><span class="back" aria-hidden="true">&#8249;</span><span class="title" id="logtitle">Log</span><span class="hint" id="busy"></span></header>
+    <div class="log" id="log"></div>
+  </section>
+
+  <!-- ===== job overlay (shown over any screen while a job runs) ===== -->
+  <div class="job" id="job" hidden>
+    <div class="job-box">
+      <div class="spinner"></div>
+      <div class="job-title" id="job-title">Working</div>
+      <div class="job-line" id="job-line"></div>
+    </div>
+  </div>
+
+  <!-- ===== exit dialog ===== -->
+  <div class="modal" id="modal" hidden>
+    <div class="box">
+      <p class="mtitle">Exit Own Your Glass?</p>
+      <p class="mtext">Everything applied stays in place while the app is closed.</p>
+      <div class="mbtns">
+        <button class="pill" data-m="stay">Stay</button>
+        <button class="pill" data-m="exit">Exit</button>
+      </div>
+    </div>
+  </div>
+</div>
+<script src="app.js"></script>
+</body>
+</html>

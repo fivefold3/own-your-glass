@@ -1,0 +1,11 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 130 130">
+  <!-- Own Your Glass: orange tile, white TV with an eye inside; the pupil is a microphone -->
+  <rect width="130" height="130" fill="#e0a33e"/>
+  <rect x="17" y="24" width="96" height="66" rx="9" fill="none" stroke="#fff" stroke-width="6"/>
+  <path d="M52 100 h26 M65 90 v10" stroke="#fff" stroke-width="6" stroke-linecap="round"/>
+  <path d="M33 57 Q65 30 97 57 Q65 84 33 57 Z" fill="none" stroke="#fff" stroke-width="5" stroke-linejoin="round"/>
+  <circle cx="65" cy="57" r="15" fill="#fff"/>
+  <rect x="61" y="46" width="8" height="14" rx="4" fill="#e0a33e"/>
+  <path d="M58 56 a7 7 0 0 0 14 0" fill="none" stroke="#e0a33e" stroke-width="2.4" stroke-linecap="round"/>
+  <path d="M65 63 v4 M61.5 67 h7" stroke="#e0a33e" stroke-width="2.4" stroke-linecap="round"/>
+</svg>
