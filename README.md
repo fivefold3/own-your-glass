@@ -51,14 +51,22 @@ leaves LG's time-sync and app-store hosts alone.
 
 You need a rooted TV with Homebrew Channel (see <https://www.webosbrew.org/rooting/>).
 
+### Homebrew Channel
+
+Homebrew Channel > Settings > **Add repository**, and enter:
+
+```
+https://raw.githubusercontent.com/fivefold3/webos-homebrew-repo/main/repo.json
+```
+
+### Manual
+
 ```sh
 tools/build-ipk.sh                       # -> dist/org.ownyourglass.app_1.0.0_all.ipk
 tools/deploy.sh root@<tv-ip> --launch    # scp + the stock installer, no LG SDK needed
 ```
 
-or install the ipk from a GitHub release URL with Homebrew Channel's
-installer. Both paths and the repository manifest are described in
-[docs/HOMEBREW.md](docs/HOMEBREW.md). Installing changes nothing; open the app
+Installing changes nothing; open the app
 and press **Own the glass**. The main screen shows one thing: whether the
 glass is owned by you or by LG. Settings holds a toggle per protection (OK
 flips it, Apply commits), the log, undo and uninstall. Options that cost you
