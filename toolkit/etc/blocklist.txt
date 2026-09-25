@@ -11,6 +11,11 @@
 #   *ngfts.lge.com                          — LG first-time-setup provisioning;
 #       the terms-and-conditions UI loads from it and shows "system error"
 #       when it is sinkholed
+#   the hosts behind LG's gateway (sdx)     — they carry a country or region
+#       prefix (<CC>.rdx2.nextlgsdp.com, <RIC>.tv.wiselg.com), so a fixed
+#       list only fits one region. The network module adds them at apply
+#       time from sdx's own routing table: every host that only blocked sdx
+#       services use (see modules/sdx.sh).
 
 # --- LG advertising / ACR ---
 ads.lgtvcommon.com
@@ -35,11 +40,6 @@ eic.lab.lgtvcommon.com
 pnv.lgtvcommon.com
 qcardservice.lgtvcommon.com
 eic.lgtviot.com
-eic.api.lgtviot.com
-eic.tv.wiselg.com
-rdx2.nextlgsdp.com
-ibs.nextlgsdp.com
-ibsstat.nextlgsdp.com
 lggalleryplus.com
 cf-kic.lggalleryplus.com
 

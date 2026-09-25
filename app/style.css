@@ -57,8 +57,8 @@ html,body{height:100%;overflow:hidden;background:var(--bg);color:var(--text);
   transition:background .15s,transform .18s var(--ease)}
 .item .text{flex:1;min-width:0}
 .item .name{font-size:32px;font-weight:500;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-.item .desc{font-size:24px;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-.item .breaks{font-size:22px;color:var(--amber);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.item .desc{font-size:24px;color:var(--muted);overflow-wrap:break-word}
+.item .breaks{font-size:22px;line-height:1.3;color:var(--amber);margin-top:4px;overflow-wrap:break-word}
 .item.focus .breaks{color:#8a5a0a}
 .item .state{font-size:24px;color:var(--muted);white-space:nowrap}
 .item.ok .state{color:var(--good)} .item.fail .state,.item.warn .state{color:var(--bad)} .item.pendingchange .state{color:var(--amber)}

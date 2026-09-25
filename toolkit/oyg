@@ -27,7 +27,7 @@ else
     OYG_TK=${OYG_TK:-/nonexistent}   # single-file bundle (tools/bundle.sh): everything is inline
 fi
 
-MODULES="nag acr telemetry remote voice mic capture consent apps cloud network"   # nag first: it races eula-service at boot
+MODULES="nag acr telemetry remote voice mic capture consent apps cloud sdx network"   # nag first: it races eula-service at boot
 ENABLED_FILE="$OYG_ROOT/enabled"
 NOPERSIST_FILE="$OYG_ROOT/nopersist"      # exists = do NOT re-apply at boot (default is to re-apply)
 BOOT_MARK="$OYG_ROOT/boot.unconfirmed"    # exists at boot = last boot-apply was never confirmed

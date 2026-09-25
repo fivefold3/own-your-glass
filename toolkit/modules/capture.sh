@@ -1,13 +1,15 @@
 # capture — the screen-capture leak.
 #
-# A panel-maintenance service asks captureservice for a 640x360 grab of the
-# UI plane every ~3 s and writes it to /tmp/capture.rgb, world-readable, and
-# /tmp is shared into every app sandbox. Rather than stop the panel service,
-# we bind a root-only 0600 file (on tmpfs, so no flash wear) over that path:
-# the writer keeps writing, but nothing unprivileged can read it, and the
-# mountpoint cannot be unlinked and recreated with looser permissions.
-# The vendor's video-plane grabber (vtCaptureTestSuite) is bound to
-# /dev/null as well.
+# The OLED panel service (eplmanager, which measures on-screen luminance for
+# pixel care) asks captureservice for a 640x360 grab of the UI plane every
+# ~3 s and writes it to /tmp/capture.rgb, world-readable, and /tmp is shared
+# into every app sandbox. Rather than stop the panel service, we bind a
+# root-only 0600 file (on tmpfs, so no flash wear) over that path: the writer
+# keeps writing, but nothing unprivileged can read it, and the mountpoint
+# cannot be unlinked and recreated with looser permissions. The jails see the
+# original file under the bind, so it is emptied and made 0600 first.
+# vtCaptureTestSuite, a vendor command-line tool that dumps the video plane
+# (nothing on the TV launches it), is bound to /dev/null as well.
 MOD_CAPTURE_DESC="Screen-capture file readable by every app, video-plane grabber"
 MOD_CAPTURE_DEFAULT=on
 
@@ -22,12 +24,18 @@ mod_capture_apply() {
         [ -e "$CAP_FILE" ] || { : > "$CAP_FILE"; mark_created "$CAP_FILE"; }
     fi
     if is_mounted "$CAP_FILE"; then ok "capture file already shielded"
-    else bind_file "$CAP_SHADOW" "$CAP_FILE" && ok "capture file shielded (root-only)"; fi
+    else
+        # App jails see the file under the bind, not the bind: empty it and
+        # make it root-only first, or they keep the last frame, readable.
+        set_mode "$CAP_FILE" 600
+        run "empty $CAP_FILE" sh -c ": > $CAP_FILE"
+        bind_file "$CAP_SHADOW" "$CAP_FILE" && ok "capture file shielded (root-only)"
+    fi
     [ -e "$VTCAP" ] && bind_null "$VTCAP" && ok "video-plane grabber blocked"
     kv_set applied 1
     return 0
 }
-mod_capture_restore() { generic_restore; }
+mod_capture_restore() { restore_mounts; generic_restore; }   # unbind first: the mode belongs to the file underneath
 mod_capture_status() {
     _r=0
     if is_mounted "$CAP_FILE"; then st CAPTURE OK "capture file root-only"

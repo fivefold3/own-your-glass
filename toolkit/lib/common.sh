@@ -7,7 +7,7 @@
 # uninstalled) replays those records to put the TV back. No module needs its
 # own undo bookkeeping.
 
-OYG_VERSION="1.2.3"
+OYG_VERSION="1.2.4"
 
 OYG_APPID=${OYG_APPID:-org.ownyourglass.app}
 OYG_APPDIR=${OYG_APPDIR:-/media/developer/apps/usr/palm/applications/$OYG_APPID}
@@ -191,8 +191,12 @@ kill_pids() {  # kill_pids "<what>" pid...
     # one kill per pid: BusyBox kill returns non-zero if any pid is already gone
     if [ "$OYG_DRYRUN" = 1 ]; then info "(dry-run) TERM $_w ($_p)"; return 0; fi
     info "TERM $_w ($_p)"; for _i in $_p; do kill -TERM "$_i" 2>/dev/null; done
-    sleep 1
-    _left=""; for _i in $_p; do [ -d "/proc/$_i" ] && _left="$_left $_i"; done
+    # give them up to a second to exit, checking every 0.1 s
+    _t=0; while [ $_t -lt 10 ]; do
+        _left=""; for _i in $_p; do [ -d "/proc/$_i" ] && _left="$_left $_i"; done
+        [ -z "$_left" ] && break
+        sleep 0.1; _t=$((_t+1))
+    done
     if [ -n "$_left" ]; then info "KILL $_w ($_left)"; for _i in $_left; do kill -KILL "$_i" 2>/dev/null; done; fi
     ps_snapshot
     return 0
@@ -213,7 +217,8 @@ have_unit()   { [ -n "$(unit_path "$1")" ]; }
 
 OYG_NEED_RELOAD=0
 stop_unit() {  # remembers units that were active so restore can start them
-    unit_active "$1" && state_add units "$1"
+    unit_active "$1" || return 0   # already stopped (a re-apply): nothing to do
+    state_add units "$1"
     # --no-block: a unit that ignores SIGTERM would otherwise hold us for its
     # stop timeout (90 s). We kill the process ourselves right after.
     run "systemctl stop $1" systemctl --no-block stop "$1"
@@ -250,12 +255,12 @@ toast() {
 # At boot the notification service ignores toasts until the UI is up. Wait
 # (up to ~3 min) for the boot manager to report a finished boot with the
 # first app launched, then toast.
+boot_done() {
+    luna luna://com.webos.bootManager/getBootStatus '{}' | tr -d ' \n' | grep -q '"boot-done":true.*"firstAppLaunched":true\|"firstAppLaunched":true.*"boot-done":true'
+}
+wait_boot_done() { _i=0; while [ $_i -lt 36 ] && ! boot_done; do sleep 5; _i=$((_i+1)); done; }
 toast_after_boot() {
-    _i=0
-    while [ $_i -lt 36 ]; do
-        luna luna://com.webos.bootManager/getBootStatus '{}' | tr -d ' \n' | grep -q '"boot-done":true.*"firstAppLaunched":true\|"firstAppLaunched":true.*"boot-done":true' && break
-        sleep 5; _i=$((_i+1))
-    done
+    wait_boot_done
     sleep 3
     toast "$1"
 }

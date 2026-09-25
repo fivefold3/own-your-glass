@@ -5,7 +5,9 @@ Privacy hardening for rooted LG webOS TVs, packaged as a Homebrew Channel app.
 It stops the parts of the TV that watch you: automatic content recognition
 (ACR), the advertising overlays and ad-ID manager, log and crash uploaders,
 LG remote support, the remote and far-field microphone pipelines and their
-wake-word triggers, and the world-readable screen-capture file. It declines
+wake-word triggers, the world-readable screen-capture file, LG's cloud and
+smart-home daemons, and the logging and marketing traffic that goes out
+through LG's network gateway. It declines
 every tracking consent in every store the TV keeps, turns the ad and data
 settings off through LG's own settings service, and hides the ad, ACR and
 demo apps from the launcher. Everything is undone by pressing one button or
@@ -22,30 +24,102 @@ through Homebrew Channel's root service. For each unwanted daemon the toolkit
 stops its unit, bind-mounts `/dev/null` over its binary so nothing can start
 it again, and kills what is running. Persistent files (consent stores, the
 hidden-app list) are backed up once and rewritten. A boot hook in
-`/var/lib/webosbrew/init.d` re-applies all of it on boot only if you opted in
-(off by default, so a reboot is always a way out). If it finds the app has
-been uninstalled, it restores every recorded change and removes itself. Full details in [docs/DESIGN.md](docs/DESIGN.md).
+`/var/lib/webosbrew/init.d` re-applies all of it on every boot, guarded by a
+crash-loop breaker (see [Reboots](#reboots)). If it finds the app has been
+uninstalled, it restores every recorded change and removes itself. Full
+details in [docs/DESIGN.md](docs/DESIGN.md).
 
 ## Modules
 
 | module | default | what it stops |
 |---|---|---|
-| `acr` | on | `acr2`, `adoverlay-service`, `admanager`, `livepick-plus`, `contentminer`, `objectdetection` |
-| `telemetry` | on | `uploadd`, `rdxd`, `rdx_reporter`, `remotelogger`, `nudge` |
+| `acr` | on | `acr2`, `adoverlay-service`, `admanager`, `livepick-plus`, plus `contentminer` (Home preview rows), which is not ACR |
+| `telemetry` | on | `uploadd`, `rdxd`, `rdx_reporter`, `remotelogger`, `nudge`, `service-logger`, `user-context-manager`, `ocpservice`, `sdp-server-notice`, `ftms` |
 | `remote` | on | `remotediag` (RemoteOne), the telnet root shell, the world-writable Homebrew Channel service tree |
-| `voice` | on | `voiceinput_hidraw`, `voiceinput_sound`, `voiceinput_preprocessor`, `voiceinput_network`, `voiceconductor`, `voiceclick`, `trigger_alexa`, `trigger_thinq`, Alexa and ThinQ AI adapters (the `voiceinput` hub itself stays up: Settings queries it, and it has no inputs left) |
+| `voice` | on | `voiceinput_hidraw`, `voiceinput_sound`, `voiceinput_preprocessor`, `voiceinput_network`, `voiceclick`, `trigger_alexa`, `trigger_thinq`, `airessrvallocator`, the Alexa and ThinQ AI adapters and the voice performer, including their jailed copies (the `voiceinput` hub and `voiceconductor` stay up: Settings calls both, and a call to a blocked `voiceconductor` never returns, which stopped the Date & Time page loading; neither has any input left) |
 | `mic` | on | the microphone capture endpoints (far-field "WoV" mic array); everything else that ALSA calls "capture" is internal audio routing (the sound-out path that feeds Bluetooth headphones, WiSA speakers and sound share, the recorder tap, mixer loops) and is left alone |
-| `capture` | on | `/tmp/capture.rgb` becomes root-only (bind of a 0600 tmpfs file); `vtCaptureTestSuite` blocked |
+| `capture` | on | `/tmp/capture.rgb` is emptied and becomes root-only (bind of a 0600 tmpfs file); `vtCaptureTestSuite` blocked |
 | `consent` | on | declines S_VNG/S_ADG/S_TAG/S_MKT/… in all four stores (the mandatory terms of use and privacy policy stay accepted, so no agreements wall); sets adCookie, aiNudge, thirdPartyCookie, watchedListCollection, usageCare, welcomeFeature and friends off |
 | `nag` | on | keeps `launchEulaByHome` off with a watcher that resets it within a second (that flag is what makes the Home app raise the "User Agreements" wall); clears pending "updated" flags. `eula-service` is left running: stopping it broke SDX's eula status, which `accountmanager` checks at boot, and that re-raised the LG account terms prompt |
 | `apps` | on | hides 41 ad/ACR/remote-support/demo app ids via `blockedSystemAppList/<REGION>.json` |
-| `cloud` | off | ThinQ IoT client and proxy, push client, rule engine, home connect, Matter, family care, MyCar, buddy connector, always-ready, sports alerts, AI inference, Google Home, Chromecast provisioning, app casting, Avahi, DIAL discovery, WowPlay |
-| `network` | off | bind-mounts a generated `/etc/hosts` that sinkholes 75 ad, ACR, telemetry and DoH hostnames (IPv4 and IPv6) |
+| `cloud` | on | ThinQ IoT client and proxy, push client, rule engine, Home Hub, Matter, Family Care, MyCar, LG Buddy, Always Ready, sports alerts, AI inference, the Google Home hub, Chromecast provisioning, app casting, Avahi, the DIAL server, WOWCAST |
+| `sdx` | on | routes 23 of the 38 services behind LG's network gateway (logging, beacons, nudges, recommendations, shop, LG Channels) to nowhere, by rewriting its routing table; sign-in, the clock, the Content Store, AirPlay and Settings keep their LG hosts |
+| `network` | on | bind-mounts a generated `/etc/hosts` that sinkholes the fixed list of ad, ACR, telemetry and DoH hostnames, plus the gateway hosts only blocked `sdx` services use, with this TV's own country and region prefixes (IPv4 and IPv6) |
 
-`cloud` is off because it breaks the ThinQ phone app, Google Home, AirPlay
-discovery and casting. `network` is off because stopping the senders is the
-point; the sinkhole is a belt-and-braces layer, and the list deliberately
-leaves LG's time-sync and app-store hosts alone.
+Every module is on by default. Three of them cost features, and each says so
+under its name in the app:
+
+- `cloud` breaks the ThinQ phone app, the Home Hub, the Google Home hub, LG
+  Buddy, WOWCAST soundbar audio and launching apps from a phone (DIAL).
+  AirPlay is unaffected: it has its own mDNS service.
+- `sdx` empties the Home screen's recommendation and promo rows, the LG
+  Channels online guide, the LG shop and sports alerts. On the reference TV,
+  the Content Store (including installing an app), AirPlay, Settings and
+  automatic time were tested working with it on.
+- `network` stops anything that uses a sinkholed host. It is the
+  belt-and-braces layer behind the other modules, and it leaves LG's clock,
+  Content Store and sign-in hosts alone.
+
+### What each service does
+
+Everything a module stops, and the services it deliberately leaves alone, as
+found on a C5 (webOS 10.3.1) by reading its binary, its Luna
+registration and its logs. "Inferred" marks what comes from names and strings
+only. A service that is not on your TV is skipped.
+
+| module | service | what it does | sends data |
+|---|---|---|---|
+| `acr` | `acr2` | captures audio and video from broadcast and HDMI and runs a downloaded recognition library on it (an Alphonso data directory is on the TV) | yes, through that library (inferred) |
+| `acr` | `adoverlay-service` / `adoverlay` | draws shoppable and interactive ads over live TV and HDMI inputs | yes |
+| `acr` | `admanager` | advertising identifier, ad cookie, ad downloads and click tracking; runs all the time | yes (sdx, direct) |
+| `acr` | `livepick-plus` | turns ACR and guide data into notice-bar offers (food delivery, shopping) | downloads offers |
+| `acr` | `contentminer` | downloads the per-app preview rows on the Home screen from LG, optionally personalised | yes (sdx) |
+| – | `objectdetection`, `objectdetectionutilizer` | on-device text and sign-language detection for "sign language zoom". **Not blocked**: it sends nothing, and earlier versions only blocked it because it looked like part of ACR | no |
+| `telemetry` | `uploadd` | sends crash and analytics reports to LG | yes |
+| `telemetry` | `rdxd` | builds crash and analytics reports for `uploadd` | through `uploadd` |
+| `telemetry` | `rdx_reporter` | command-line tool that makes one report | no |
+| `telemetry` | `remotelogger` | crash backtrace helper | no network code |
+| `telemetry` | `nudge` | "AI Recommendation" tips picked from your app and channel usage | indirectly |
+| `telemetry` | `service-logger` | logs first use of each app, HDMI device brands, game inputs, volume and picture mode by rules LG can update | collects; upload path not traced |
+| `telemetry` | `user-context-manager` | records app and channel watch start and end times with your user number; ranks recent apps | yes (sdx `nudge_log_secure`) |
+| `telemetry` | `ocpservice` | OLED Care: panel hours, pixel-refresher runs, picture settings | yes (`ocp.lgtviot.com`) |
+| `telemetry` | `sdp-server-notice` | LG server notices and "alarm nudge" popups | downloads only |
+| `telemetry` | `ftms` | detects Bluetooth LE fitness machines (FTMS) | downloads the list of apps it may show over |
+| `remote` | `remotediag` | RemoteOne: LG support can push SSH keys, install dropbear, capture the screen, send keys, reboot and reset the TV | yes (`rone-*.lge.com`) |
+| `remote` | telnet | Homebrew Channel's root shell on port 23, with no password | – |
+| `remote` | Homebrew Channel service tree | the root service's files, shipped world-writable | – |
+| `voice` | `voiceinput_hidraw` | reads the Magic Remote microphone | no |
+| `voice` | `voiceinput_sound`, `voiceinput_preprocessor` | read and prepare the built-in far-field microphone | no |
+| `voice` | `voiceinput_network` | receives microphone audio from a paired phone | no |
+| – | `voiceconductor` | orchestrates voice requests (speech to text, intent, Alexa or ThinQ AI). **Not blocked**: Settings asks it for the supported languages at startup and waits for the answer, so blocking it broke the Date & Time page | no; the speech goes out through `nlpmanager` |
+| `voice` | `voiceclick` | finds clickable areas on screen for voice control | downloads its model |
+| `voice` | `trigger_alexa`, `trigger_thinq` | wake-word listeners | no |
+| `voice` | `amazon-alexa-adapter` | Alexa built-in (runs in a jail) | yes |
+| `voice` | `lg.thinqai.adapter` | ThinQ AI assistant and voice ID (runs in a jail) | yes |
+| `voice` | `airessrvallocator` | allocates the NPU for on-device AI models | no |
+| `voice` | `performer` | carries out voice commands (runs in a jail) | yes |
+| `mic` | "WoV PDM Mic" capture device | the built-in far-field microphone | – |
+| `capture` | `/tmp/capture.rgb` | a 640x360 grab of the UI every 3 s, written by the OLED panel service (for pixel care) and readable by every app | – |
+| `capture` | `vtCaptureTestSuite` | vendor command-line tool that dumps the video plane (nothing launches it) | no |
+| `cloud` | `iot-client` | ThinQ MQTT link (`connect-client.lgthinq.com`) | yes |
+| `cloud` | `iot-proxy` | ThinQ HTTPS proxy for the Home Hub | yes |
+| `cloud` | `pushclient` | LG push channel (AWS IoT MQTT) | yes |
+| `cloud` | `ruleengine` | ThinQ and Matter routines, synced with LG | yes |
+| `cloud` | `homeconnect`, `matter` | Home Hub device manager and Matter commissioner | yes |
+| `cloud` | `familycare` | local screen-time limit lock | no |
+| `cloud` | `mycar` | connected-car features | yes |
+| `cloud` | `buddyconnector` | LG Buddy: a linked family member can control the TV, get SOS alerts and video-call (KakaoTalk) | yes |
+| `cloud` | `alwaysready` | Always Ready: always-on display and motion wake | logs through `uploadd` |
+| `cloud` | `sportsalarm`, `sportsalert` | sports score alerts | yes |
+| `cloud` | `ai-inference-manager` | installs on-device AI models and sets up the NPU (AI Picture/Sound, inferred) | no |
+| `cloud` | `google-home-controller` | installs and runs the Google Home hub runtime | yes |
+| `cloud` | `chromecast-provisioning` | installs, starts and stops the cast receiver | – |
+| `cloud` | `appcasting` | turns a phone screen share into an app deeplink | yes (sdx) |
+| `cloud` | `avahi-daemon`, `avahi-adaptor` | DNS-SD for Google Home and Miracast over LAN. AirPlay (`mdnsd`) and Chromecast have their own | – |
+| `cloud` | `com.webos.service.dial` | DIAL server: phone apps launch YouTube or Netflix on the TV. `upnpd` still advertises it, so phones connect and time out | – |
+| `cloud` | `wowplay` | WOWCAST: wireless audio to LG soundbars | no |
+| `sdx` | logging and marketing endpoints | `sdp_logging`, `rdx_secure`, `rdxdev_secure`, `ibis_stat_secure`, `nudge_secure`, `nudge_log_secure`, `homeprv_secure`, `recommend_secure`, `tlamp_secure`, `web_browser_rcmd`, `qcard`, `sdp_nais`, `sdp_onnow`, `cdpbeacon_secure`, `cdp_service_secure`, `cpv_secure`, `lgshop_secure`, `lgshoplog_secure`, `iot`, `iot_push_secure`, `iot_sports_secure`, `voice_proxy_secure`, `buddy` | – |
+| `network` | `/etc/hosts` | sends ad, ACR, telemetry and DNS-over-HTTPS hostnames to nowhere | – |
 
 ## Install
 
@@ -62,15 +136,15 @@ https://raw.githubusercontent.com/fivefold3/webos-homebrew-repo/main/repo.json
 ### Manual
 
 ```sh
-tools/build-ipk.sh                       # -> dist/org.ownyourglass.app_1.0.0_all.ipk
+tools/build-ipk.sh                       # -> dist/org.ownyourglass.app_<version>_all.ipk
 tools/deploy.sh root@<tv-ip> --launch    # scp + the stock installer, no LG SDK needed
 ```
 
-Installing changes nothing; open the app
-and press **Own the glass**. The main screen shows one thing: whether the
-glass is owned by you or by LG. Settings holds a toggle per protection (OK
-flips it, Apply commits), the log, undo and uninstall. Options that cost you
-a feature say so under their name and are off by default.
+Installing changes nothing; open the app and press **Own the glass**. The
+main screen shows one thing: whether the glass is owned by you or by LG.
+Settings holds a toggle per protection (OK flips it, Apply commits), the log,
+undo and uninstall. Options that cost you a feature say so under their name;
+turn them off there if you need that feature.
 
 ## Clearing what was already collected
 
@@ -162,9 +236,13 @@ tools/bundle.sh | ssh root@<tv-ip> 'OYG_DRYRUN=1 OYG_ROOT=/nonexistent sh -s -- 
   `/var`, `/mnt/lg` and `/media`.
 - `sdx`, `tvdataexchanger`, `eplmanager`, `captureservice`, `iconnectivity`
   (Universal Control), ConnMan, the interpreters and `/dev/hidraw*` are on a
-  hard never-touch list. Binding
-  `sdx` silently kills the Settings UI; touching ConnMan has taken a TV off
-  the network for half an hour.
+  hard never-touch list. Binding `sdx` silently kills the Settings UI (the
+  `sdx` module edits its routing table and restarts it instead); touching
+  ConnMan has taken a TV off the network for half an hour.
+- A service that is blocked while something still calls it can hang the
+  caller: a call to a blocked `voiceconductor` never returned, and Settings
+  waited on it. That is why `voiceconductor` and the `voiceinput` hub are left
+  running; after any change to a spec, the main screens are checked again.
 - Firmware updates are not blocked here. Homebrew Channel has that toggle.
 - Not a defence against an attacker who already has root.
 

@@ -4,7 +4,7 @@
 
 1. **Kill at the source.** Stop the ACR, advertising, telemetry, remote-support
    and voice daemons and make them unable to start again. DNS blocking is a
-   secondary, opt-in layer.
+   secondary layer.
 2. **Homebrew Channel packaging.** One `.ipk`, installable from Homebrew
    Channel or with `luna-send`, containing the TV app and the toolkit.
 3. **Reversible by uninstalling.** Removing the app removes every change,
@@ -54,7 +54,11 @@ whose target does not exist on the TV:
 2. optionally mask the unit by binding `/dev/null` over its unit file
    (`OYG_MASK_UNITS=1`; off, not verified on hardware),
 3. `mount --bind /dev/null <binary>` so `systemd`, `ls-hubd` (luna-launched
-   services) and activities cannot exec it again,
+   services) and activities cannot exec it again. Some daemons run chrooted
+   in `/var/palm/jail/<id>`, whose `/usr` is an overlay of the pristine
+   `/usr`, so they exec their own copy and a bind on `/usr/...` never reaches
+   them; the copy in the service's own jail is bound too (the ThinQ AI
+   adapter, the Alexa adapter and the voice performer),
 4. kill whatever is still running, by exact executable path, by process name,
    or by a substring of the command line for node/iotjs services.
 
@@ -84,6 +88,44 @@ blaster; binding it broke external-speaker control and slowed Settings),
 `pacrunner`, `crashd`, `eplmanager`, `captureservice` and `/dev/hidraw*`.
 `com.webos.app.overlaycontainer*` is never hidden (it hosts the quick-settings
 panel). ConnMan is never signalled, reloaded or restarted.
+
+## LG's gateway (sdx)
+
+Most of the TV reaches LG through one daemon, `sdx`. A caller asks
+`luna://com.webos.service.sdx/send` for a service name and a path, and `sdx`
+makes the HTTPS request, adding the device ID (derived from the MAC), the
+`fck` key, model, firmware, locale and consent state as headers. The host
+comes from its routing table, `/mnt/lg/cmn_data/sdp/sdx/server_addr_version.conf`,
+which LG's server refreshes: 38 service names on a C5, each with a domain and
+a domain type. `sdx` puts the TV's country code (`<CC>.`) in front of `default`
+domains and a regional code (`<RIC>.`) in front of `ric` ones; `getServerUrl` reports the
+result for any name.
+
+`sdx` cannot be stopped (see the never-touch list), and several of its
+callers cannot either: PmLogDaemon logs through `sdp_logging` and
+`rdxdev_secure`. So the `sdx` module edits the table, not the callers:
+blocked names get the domain `oyg.invalid` (`.invalid` never resolves), and
+the rewritten file is bound read-only over the live one so a server push
+cannot restore it. `sdx` reads the table when it starts and `ls-hubd`
+restarts it on the next call, so apply and restore end the process, never
+while the TV is still booting (`accountmanager` checks the terms status
+through `sdx` at boot).
+
+The kept names are the ones the Content Store, AirPlay and Settings were
+found to use: the store's loader asks `sdx` for request headers and loads
+the store from `<country>.app.lgwebostv.com`, `airplay-adaptor` uses
+`sdp_init`, `mfi` uses `sdp_airplay`, and Settings uses `ibis_secure` and
+`service_setting_secure`. The clock needs `sdx` too: with Settings > Date &
+Time > Set automatically on, the TV's time sources are
+`["sdp","broadcast-adjusted","broadcast","micom"]` (no NTP; LG ships
+`AllowNTPTime` off), and on the C5 the source in use is `sdp`. With it off,
+the time service ignores every outside source and keeps time on the micom
+real-time clock, reported as `factory`.
+
+The `network` module reads the same table to find the hosts that only
+blocked names use (`<CC>.rdx2.nextlgsdp.com`, `<CC>.ibsstat.nextlgsdp.com`,
+`<RIC>.api.lgtviot.com`, `<RIC>.pnv.lgtvcommon.com` on the reference C5), so its
+sinkhole follows the TV's region instead of a fixed list.
 
 ## The one watcher
 

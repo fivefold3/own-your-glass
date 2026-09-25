@@ -1,23 +1,35 @@
 # cloud — LG's cloud control plane and the "smart home" daemons.
 #
-# Off by default: this is the part that breaks features people may want
-# (ThinQ phone app, Google Home / Chromecast, AirPlay discovery, casting).
-#   iot-client / iot-proxy   AWS IoT MQTT link to LG ThinQ
-#   pushclient               LG push channel
-#   ruleengine               syncs automation rules from LG's cloud
-#   homeconnect / matter     smart-home hub
-#   familycare / mycar / buddyconnector / alwaysready / sportsalarm / sportsalert
-#   ai-inference-manager     on-device AI inference service
-#   google-home-controller, chromecast-provisioning, appcasting
-#   avahi, DIAL discovery    mDNS advertising and Chromecast-style discovery
-#   wowplay                  phone screen-mirroring receiver
+# Off by default: this is the part that breaks features people may want.
+#   iot-client               ThinQ MQTT link (connect-client.lgthinq.com)
+#   iot-proxy                ThinQ HTTPS proxy for the Home Hub
+#   pushclient               LG push channel (AWS IoT MQTT)
+#   ruleengine               ThinQ/Matter routines, synced with LG's cloud
+#   homeconnect / matter     Home Hub device manager and Matter commissioner
+#   familycare               local screen-time limit lock (no network)
+#   mycar                    connected-car features, over push topics
+#   buddyconnector           LG Buddy: a linked family member can control the
+#                            TV, get SOS alerts and video-call (KakaoTalk)
+#   alwaysready              Always Ready: always-on display, motion wake
+#   sportsalarm / sportsalert  sports score alerts (MQTT, iot_sports_secure)
+#   ai-inference-manager     installs on-device AI models and sets up the NPU
+#   google-home-controller   installs and runs the Google Home hub runtime
+#   chromecast-provisioning  installs, starts and stops the cast receiver
+#   appcasting               turns a phone screen share into an app deeplink
+#   avahi                    DNS-SD publishing for Google Home and Miracast
+#                            over LAN. AirPlay has its own mDNS (mdnsd) and
+#                            the Chromecast receiver its own: neither is here
+#   DIAL                     the DIAL server that lets phone apps launch
+#                            YouTube/Netflix on the TV (upnpd still advertises
+#                            it; launches time out)
+#   wowplay                  WOWCAST: wireless audio to LG soundbars
 # NOT here: /usr/sbin/iconnectivity is com.webos.service.ics, the Integrated
 # Control Service behind Universal Control (the Magic Remote's IR blaster for
 # soundbars and set-top boxes). Binding it broke Universal Control and made
 # Settings take ~8 s to open. It is on the never-touch list.
 MOD_CLOUD_DESC="ThinQ cloud link, push, rule engine, Google Home, casting, phone helpers"
-MOD_CLOUD_DEFAULT=off
-MOD_CLOUD_BREAKS="Breaks the ThinQ app, Home Hub and Matter, Google Home, AirPlay and Chromecast discovery, phone casting, Always Ready"
+MOD_CLOUD_DEFAULT=on
+MOD_CLOUD_BREAKS="Breaks the ThinQ app, Home Hub and Matter, the Google Home hub, LG Buddy, WOWCAST soundbar audio, launching apps from a phone (DIAL), Family Care time limits, Always Ready. AirPlay is unaffected (tested); Chromecast runs its own discovery (untested)"
 
 CLOUD_SPEC='
 iot-client|iot-client.service|/usr/palm/services/com.webos.service.iotclient/iot-client||
@@ -37,7 +49,7 @@ ai-inference|ai-inference-manager.service|?|ai-inference-manager|
 google-home|google-home-controller.service|?|google-home-controller|
 chromecast-prov|chromecast-provisioning.service|?|chromecast-provisioning|
 appcasting|appcasting.service|?|appcasting|
-avahi-daemon|avahi-daemon.service||avahi-daemon|
+avahi-daemon|avahi-daemon.service|?|avahi-daemon|
 avahi-adaptor|avahi-adaptor.service|?|avahi-adaptor|
 dial-discovery||/usr/palm/services/com.webos.service.dial/discovery-server.js||discovery-server.js
 wowplay|wowplay.service|?|wowplay|

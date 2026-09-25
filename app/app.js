@@ -47,15 +47,16 @@
   /* ---------- state ---------- */
   var SEED = [
     ["nag", "Stop the terms & conditions prompt and marketing re-consent toast"],
-    ["acr", "ACR content recognition, ad overlays, ad-ID manager"], ["telemetry", "Log uploaders, remote diagnostics, promotional nudges"],
+    ["acr", "ACR content recognition, ad overlays, ad-ID manager"], ["telemetry", "Log uploaders, usage and panel analytics, remote diagnostics, LG notices and nudges"],
     ["remote", "Remote support daemon, telnet root shell, world-writable root service"], ["voice", "Remote and far-field mic pipelines, wake words, Alexa, ThinQ AI"],
-    ["mic", "All audio capture devices (built-in and far-field mics)"], ["capture", "Screen-capture file readable by every app, video-plane grabber"],
+    ["mic", "Built-in and far-field microphones"], ["capture", "Screen-capture file readable by every app, video-plane grabber"],
     ["consent", "Decline every tracking consent, disable ad and data settings"],
     ["apps", "Hide ad, ACR, remote-support and demo apps from the launcher"],
-    ["cloud", "ThinQ cloud link, push, rule engine, Google Home, casting, phone helpers", "Breaks the ThinQ app, Home Hub and Matter, Google Home, AirPlay and Chromecast discovery, phone casting, Always Ready"],
-    ["network", "Sinkhole ad, ACR and telemetry hostnames via /etc/hosts", "Can break LG time sync (NTP) and some LG services"]];
+    ["cloud", "ThinQ cloud link, push, rule engine, Google Home, casting, phone helpers", "Breaks the ThinQ app, Home Hub and Matter, the Google Home hub, LG Buddy, WOWCAST soundbar audio, launching apps from a phone (DIAL), Family Care time limits, Always Ready. AirPlay is unaffected (tested); Chromecast runs its own discovery (untested)"],
+    ["sdx", "Cut LG's network gateway (sdx) off from its logging, beacon, nudge, shop and recommendation endpoints", "Home screen recommendations and promo cards, LG Channels online guide, LG shop, sports alerts, Home Hub and Gallery cloud features. The services the Content Store, AirPlay, Settings, sign-in and the clock use keep their LG hosts"],
+    ["network", "Sinkhole ad, ACR and telemetry hostnames via /etc/hosts", "Anything that uses a sinkholed host stops working; LG's clock, Content Store and sign-in hosts are left alone"]];
   var NAMES = { nag: "Terms prompt", acr: "ACR and ads", telemetry: "Telemetry", remote: "Remote access", voice: "Voice", mic: "Microphones",
-    capture: "Screen capture", consent: "Consents", apps: "Hidden apps", cloud: "Cloud and casting", network: "Hostname sinkhole" };
+    capture: "Screen capture", consent: "Consents", apps: "Hidden apps", cloud: "Cloud and casting", sdx: "LG gateway", network: "Hostname sinkhole" };
   var mods = SEED.map(function (x) { return { id: x[0], desc: x[1], breaks: x[2] || "", on: false, applied: false, lines: [], pending: true }; });
   var meta = {}, running = false, statusKnown = false, retries = 0, lastLog = "";
   var screen = "main", focus = { main: 0, settings: 0 }, modal = { open: false, i: 0 }, prevScreen = "main";
