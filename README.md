@@ -1,5 +1,7 @@
 # own-your-glass
 
+Not affiliated with or endorsed by LG Electronics. LG and webOS are trademarks of LG Electronics.
+
 Privacy hardening for rooted LG webOS TVs, packaged as a Homebrew Channel app.
 
 > **Built with AI assistance.** Most of the code, tooling, tests and
