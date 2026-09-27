@@ -1,0 +1,76 @@
+# System apps hidden from the launcher by option (the app manager then
+# refuses to launch them; most are already invisible). Ids not on a TV are
+# skipped. legacy = "apps" marks the ids 1.4's apps module carries (parity);
+# retire = true: 1.4 carries it, the option engine drops it.
+
+[[app]]
+ids = ["com.webos.app.acrcomponent", "com.webos.app.acrhdmi1", "com.webos.app.acrhdmi2", "com.webos.app.acrhdmi3", "com.webos.app.acrhdmi4", "com.webos.app.acroverlay"]
+option = "acr"
+legacy = "apps"
+note = "Obsolete ACR1 loaders; gone on webOS 11."
+
+[[app]]
+ids = ["com.webos.app.adoverlay", "com.webos.app.adoverlayex", "com.webos.app.adhdmi1", "com.webos.app.adhdmi2", "com.webos.app.adhdmi3", "com.webos.app.adhdmi4"]
+option = "acr"
+legacy = "apps"
+
+[[app]]
+ids = ["com.webos.app.overlaycontainer", "com.webos.app.overlaycontainerex", "com.webos.app.overlaycontainerhdmi1", "com.webos.app.overlaycontainerhdmi2", "com.webos.app.overlaycontainerhdmi3", "com.webos.app.overlaycontainerhdmi4"]
+option = "acr"
+since = "1.4"
+note = "'Container App for Commercial Overlay App': Video-ACR overlays (aic.videoacr.lgtvcommon.com; need acrOn, and on webOS 11 an account). An earlier report said they host quick settings; hidden on the C5, the quick-settings panel still opens (2026-09-26)."
+
+[[app]]
+ids = ["com.webos.app.fooddelivery", "com.webos.app.fooddeliveryex", "com.webos.app.fooddeliveryhdmi1", "com.webos.app.fooddeliveryhdmi2", "com.webos.app.fooddeliveryhdmi3", "com.webos.app.fooddeliveryhdmi4", "com.webos.app.videoads", "com.webos.app.cmp-client"]
+option = "ads"
+legacy = "apps"
+
+[[app]]
+ids = ["com.webos.app.overlaymembership"]
+option = "ads"
+legacy = "apps"
+retire = true
+note = "Not an ad app: 'LG Overlay Account', one of the two apps of the MembershipApp category Home's account button opens through launchDefaultApp. Hidden (1.2 to 1.4.4), the app manager answered 'no default app is set for the category' and the account picture did nothing (C5, 2026-09-26)."
+
+[[app]]
+ids = ["com.webos.app.adapp"]
+option = "ads"
+since = "1.4"
+note = "The full-screen ad app admanager launches; lives on the otncabi partition."
+
+[[app]]
+ids = ["com.webos.app.newandhot"]
+option = "promos"
+legacy = "apps"
+
+[[app]]
+ids = ["com.webos.app.remoteservice", "com.webos.app.svcdiagnostics"]
+option = "remote-support"
+legacy = "apps"
+note = "remoteservice is remotediag's front end."
+
+[[app]]
+ids = [
+  "com.webos.app.store-demo", "com.webos.app.sync-demo",
+  "com.webos.exampleapp.enyoapp.epg", "com.webos.exampleapp.groupowner", "com.webos.exampleapp.nav",
+  "com.webos.exampleapp.qmlapp.client.negative.one", "com.webos.exampleapp.qmlapp.client.negative.two",
+  "com.webos.exampleapp.qmlapp.client.positive.one", "com.webos.exampleapp.qmlapp.client.positive.two",
+  "com.webos.exampleapp.qmlapp.discover", "com.webos.exampleapp.qmlapp.epg", "com.webos.exampleapp.qmlapp.hbbtv",
+  "com.webos.exampleapp.qmlapp.livetv", "com.webos.exampleapp.qmlapp.search", "com.webos.exampleapp.systemui",
+]
+option = "remote-support"
+legacy = "apps"
+note = "Retail demo and example apps."
+
+[[app]]
+ids = ["com.webos.app.factorywin", "com.webos.app.quickrecovery"]
+option = "remote-support"
+legacy = "apps"
+retire = true
+note = "factorywin is the service menu (physical access only); quickrecovery is on no surveyed image."
+
+[[app]]
+ids = ["com.webos.app.aiagent", "com.webos.app.aipromotion"]
+option = "ai"
+since = "1.4"
+note = "webOS 11: the AI agent panel and the 'turn on hands-free voice' / 'register Voice ID' popups."

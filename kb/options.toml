@@ -1,0 +1,358 @@
+# The user-facing options: what the app's Customize screen toggles and what
+# the presets are made of. Everything OYG does belongs to exactly one option
+# (services.toml, sdx.toml, hosts.toml, settings.toml, apps.toml say which).
+#
+# Fields:
+#   id        stable id (the state scope on the TV; never reuse a retired one)
+#   category  categories.toml id
+#   name      shown in the app
+#   what      what it does, in one or two plain sentences
+#   breaks    what stops working ("" = nothing the owner would notice)
+#   presets   which presets turn it on: recommended, strict, lockdown
+#   hook      toolkit code the option runs besides its declared contents
+#   warning   a confirm dialog before turning it on
+#   needs_test  true = not yet verified on a TV; kept out of presets until it is
+#   since     the first build that ships it ("planned" = not yet)
+
+# --------------------------------------------------------------- ads --
+[[option]]
+id = "acr"
+category = "ads"
+name = "Content recognition (ACR)"
+what = "Stops content recognition (ACR) of what you watch."
+breaks = "Live Plus overlays"
+presets = ["recommended", "strict", "lockdown"]
+since = "1.4"
+
+[[option]]
+id = "ads"
+category = "ads"
+name = "Ad services"
+what = "Stops LG's ad ID, ad logs and ad apps, and turns the ad settings off."
+breaks = "Reset advertising ID, LG Shop"
+presets = ["recommended", "strict", "lockdown"]
+since = "1.4"
+
+[[option]]
+id = "adid"
+category = "ads"
+name = "Opt-out advertising ID"
+what = "Set LG's advertising ID to zeros (opt-out)."
+breaks = ""
+detail = "Re-applied at every start; the ID file is covered read-only, so nothing can write a new one. The device IDs LG uses to recognise the TV are left alone."
+presets = ["recommended", "strict", "lockdown"]
+hook = "adid"
+since = "1.4"
+
+[[option]]
+id = "promos"
+category = "ads"
+name = "Home promotions and recommendations"
+what = "Stops the promoted rows and AI tips on Home."
+breaks = "Home preview rows, promo cards, AI tips"
+presets = ["recommended", "strict", "lockdown"]
+since = "1.4"
+
+[[option]]
+id = "lgchannels"
+category = "ads"
+name = "LG Channels"
+what = "Turns off LG's free ad-supported channels."
+breaks = "LG Channels"
+detail = "Turned off again, LG Channels needs a TV restart (the TV reads its hidden apps only at start-up); the app offers one."
+presets = ["strict", "lockdown"]
+since = "1.4"
+
+# ------------------------------------------------------------- usage --
+[[option]]
+id = "diagnostics"
+category = "usage"
+name = "Crash and log uploads"
+what = "Stops crash reports and log uploads to LG."
+breaks = ""
+presets = ["recommended", "strict", "lockdown"]
+since = "1.4"
+hook = "diagnostics"
+
+[[option]]
+id = "usage-logs"
+category = "usage"
+name = "Viewing and usage logs"
+what = "Stops the logs of what you watch and use."
+breaks = "Reset usage data, recent-apps order, monthly report"
+presets = ["recommended", "strict", "lockdown"]
+since = "1.4"
+
+[[option]]
+id = "consents"
+category = "usage"
+name = "Tracking consents"
+what = "Declines every tracking and ad consent."
+breaks = ""
+detail = "The basic terms of use and privacy policy stay accepted."
+presets = ["recommended", "strict", "lockdown"]
+since = "1.4"
+hook = "consents"
+
+[[option]]
+id = "hbbtv-tracking"
+category = "usage"
+name = "HbbTV tracking"
+what = "Asks broadcasters' interactive pages not to track you."
+breaks = ""
+presets = ["recommended", "strict", "lockdown"]
+since = "1.4"
+
+[[option]]
+id = "hbbtv"
+category = "usage"
+name = "HbbTV"
+what = "Turns off broadcasters' interactive pages."
+breaks = "Freeview Plus, red button"
+detail = "Not yet tested on a TV with broadcast reception."
+presets = ["strict", "lockdown"]
+needs_test = true
+since = "1.4"
+
+# ------------------------------------------------------------- voice --
+[[option]]
+id = "voice"
+category = "voice"
+name = "Voice assistants and wake words"
+what = "Stops the voice assistants and wake words."
+breaks = "Voice search, Alexa, ThinQ AI"
+presets = ["recommended", "strict", "lockdown"]
+since = "1.4"
+hook = "voice"
+
+[[option]]
+id = "mic"
+category = "voice"
+name = "Built-in microphone"
+what = "Blocks the built-in microphone."
+breaks = "Hands-free voice"
+presets = ["recommended", "strict", "lockdown"]
+since = "1.4"
+hook = "mic"
+
+[[option]]
+id = "voice-core"
+category = "voice"
+name = "Voice framework and search"
+what = "Also stops the voice framework and search."
+breaks = "Settings speed, automatic time, time zones, search"
+detail = "Verified on the C5: Settings opens slowly, Date & Time cannot be set automatically, the time-zone list and search results do not load."
+presets = ["lockdown"]
+since = "1.4"
+
+# ------------------------------------------------------------ screen --
+[[option]]
+id = "capture"
+category = "screen"
+name = "Screen-capture shield"
+what = "Hides the screen captures the OLED service keeps."
+breaks = ""
+detail = "Also blocks a vendor video-plane grabber."
+presets = ["recommended", "strict", "lockdown"]
+since = "1.4"
+hook = "capture"
+
+# ----------------------------------------------------------- casting --
+[[option]]
+id = "airplay"
+category = "casting"
+name = "AirPlay"
+what = "Turns off AirPlay."
+breaks = "AirPlay, HomeKit (Siri)"
+detail = "The TV still shows in the AirPlay list, but connecting fails."
+presets = ["strict", "lockdown"]
+since = "1.4"
+
+[[option]]
+id = "cast"
+category = "casting"
+name = "Google Cast"
+what = "Turns off Chromecast built-in."
+breaks = "Google Cast"
+detail = "The TV no longer shows up as a Cast device."
+presets = ["strict", "lockdown"]
+since = "1.4"
+
+[[option]]
+id = "phone"
+category = "casting"
+name = "Phone apps and second screen"
+what = "Stops phones controlling the TV over the network."
+breaks = "Phone remote apps, launching apps from a phone, LG Link"
+detail = "Turned off again, phone remote apps need a TV restart (LG's phone server starts only with the TV); the app offers one."
+presets = ["strict", "lockdown"]
+hook = "phone"
+since = "1.4"
+
+[[option]]
+id = "miracast"
+category = "casting"
+name = "Screen Share"
+what = "Turns off Screen Share."
+breaks = "Screen Share"
+detail = "Also stops the TV's network announcements (avahi), which the Google Home hub uses to find devices. Turned off again, Screen Share needs a TV restart; the app offers one."
+presets = ["strict", "lockdown"]
+hook = "miracast"
+since = "1.4"
+
+[[option]]
+id = "uei-cloud"
+category = "casting"
+name = "Universal Control cloud lookups"
+what = "Stops Universal Control reporting your devices to UEI's cloud."
+breaks = ""
+detail = "Devices already set up keep working and new ones still set up (C5)."
+presets = ["strict", "lockdown"]
+since = "1.4"
+
+[[option]]
+id = "lan"
+category = "casting"
+name = "LAN firewall"
+what = "Closes the TV to all inbound connections from your local network."
+breaks = "SSH, AirPlay, Google Cast, phone apps, Screen Share, network devices in Universal Control"
+detail = "Replies to connections the TV makes itself (streaming, browsing) still get through. IPv6 is off while it is on (the firewall cannot filter it). `oyg lan allow <ip>` lets a device through, for example your computer for SSH; otherwise turn the firewall off from the app on the TV."
+presets = ["strict", "lockdown"]
+hook = "lan"
+since = "1.4"
+
+# ------------------------------------------------------------- cloud --
+[[option]]
+id = "thinq"
+category = "cloud"
+name = "ThinQ and Home Hub"
+what = "Stops LG's ThinQ cloud and smart-home links."
+breaks = "ThinQ app, Home Hub, Matter, LG notifications"
+presets = ["recommended", "strict", "lockdown"]
+since = "1.4"
+
+[[option]]
+id = "google-home"
+category = "cloud"
+name = "Google Home hub"
+what = "Stops the Google Home hub."
+breaks = "Google Home hub"
+presets = ["recommended", "strict", "lockdown"]
+since = "1.4"
+
+[[option]]
+id = "buddy-sports"
+category = "cloud"
+name = "LG Buddy and sports alerts"
+what = "Stops LG Buddy and sports alerts."
+breaks = "LG Buddy, sports alerts"
+presets = ["recommended", "strict", "lockdown"]
+since = "1.4"
+
+[[option]]
+id = "ai"
+category = "cloud"
+name = "AI features"
+what = "Stops LG's cloud AI features."
+breaks = "Life-on-Screen art, AI agent"
+detail = "The TV's own AI Picture and AI Sound keep working (they run on the TV)."
+presets = ["strict", "lockdown"]
+since = "1.4"
+
+[[option]]
+id = "backup-presence"
+category = "cloud"
+name = "Settings backup and presence"
+what = "Stops settings backup to LG and presence sensing."
+breaks = "Settings backup"
+presets = ["recommended", "strict", "lockdown"]
+since = "1.4"
+
+[[option]]
+id = "universal-control"
+category = "cloud"
+name = "Universal Control and LAN device scanning"
+what = "Stops Universal Control and its network scanning."
+breaks = "Universal Control"
+detail = "The remote no longer controls boxes and soundbars (the volume pop-up shows a cross)."
+presets = ["lockdown"]
+since = "1.4"
+
+# ----------------------------------------------------------- network --
+[[option]]
+id = "trackers"
+category = "network"
+name = "Tracker hostnames"
+what = "Blocks ad, analytics and tracking hostnames."
+breaks = ""
+detail = "For everything on the TV, apps and browser included; also public DNS-over-HTTPS servers."
+presets = ["recommended", "strict", "lockdown"]
+since = "1.4"
+
+[[option]]
+id = "store-traffic"
+category = "network"
+name = "LG Store and account traffic"
+what = "Cuts the LG servers behind the Content Store."
+breaks = "App installs and updates, Home content"
+detail = "Also stops Chromecast built-in from starting after a restart (Lockdown turns Cast off anyway)."
+presets = ["lockdown"]
+since = "1.4"
+
+[[option]]
+id = "remote-config"
+category = "network"
+name = "Remote configuration"
+what = "Cuts LG's remote configuration servers."
+breaks = "Online programme guide"
+detail = "Also stops Chromecast built-in from starting after a restart (Lockdown turns Cast off anyway). Nothing else was noticed on the C5."
+presets = ["lockdown"]
+since = "1.4"
+
+# ------------------------------------------------------------ access --
+[[option]]
+id = "remote-support"
+category = "access"
+name = "Remote support and root hygiene"
+what = "Stops LG remote support and locks down root access."
+breaks = "LG remote support"
+detail = "Also keeps Homebrew Channel's telnet root shell off and fixes world-writable root files."
+presets = ["recommended", "strict", "lockdown"]
+since = "1.4"
+hook = "remote"
+
+[[option]]
+id = "account"
+category = "access"
+name = "Block LG account"
+what = "Removes any LG account and blocks sign-in."
+breaks = "Content Store installs, LG account features"
+detail = "The sign-in screen shows a network error. With no account, LG cannot tie the TV to one and the account terms prompt never appears."
+warning = "Any LG account is removed and signing in is blocked. Turn this off when you need to sign in."
+presets = ["strict", "lockdown"]
+hook = "account"
+since = "1.4"
+
+[[option]]
+id = "terms"
+category = "access"
+name = "Terms prompts"
+what = "Stops the 'User Agreements' prompt."
+breaks = ""
+detail = "The LG account terms prompt comes with a signed-in account: Block LG account stops it."
+presets = ["recommended", "strict", "lockdown"]
+since = "1.4"
+hook = "nag"
+
+# ---------------------------------------------------------- advanced --
+[[option]]
+id = "early"
+category = "advanced"
+name = "Block before the boot hook"
+what = "Writes the launch block list and the gateway table into the TV's own files, so they hold from the first second of a boot instead of when Own Your Glass starts."
+breaks = ""
+warning = "While this is on, restarting the TV no longer gives you a stock TV, and turning boot persistence off does not undo it. Turn this option off, restore, or uninstall to undo it."
+presets = []
+hook = "early"
+needs_test = true
+since = "planned"

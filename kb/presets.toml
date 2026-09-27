@@ -1,0 +1,20 @@
+# The presets the app offers. Which options each one turns on is in
+# options.toml (field presets); an option still marked needs_test stays out
+# of every preset until it has been verified on a TV. Custom is the owner's
+# one saved selection and has no entry here.
+
+[[preset]]
+id = "recommended"
+name = "Recommended"
+summary = "Blocks tracking and ads; keeps casting, phone apps and the Store working."
+
+[[preset]]
+id = "strict"
+name = "Strict"
+summary = "Also turns off casting, phone control and LG Channels, closes the TV to your network and blocks your LG account."
+
+[[preset]]
+id = "lockdown"
+name = "Lockdown"
+summary = "Also disables some LG system services. Makes settings slow to open, breaks automatic time / timezone and more."
+warning = "Lockdown is not recommended and may cause unexpected behaviour."

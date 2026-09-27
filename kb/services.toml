@@ -1,0 +1,901 @@
+# Every service OYG blocks, releases or must never touch. One record per
+# service. Only names, paths and findings are recorded here, never LG files.
+#
+# Spec fields (what lib/svc.sh receives, see there):
+#   unit binary comm argmatch ls2 flags
+#   binary "?" = find by comm in the bin dirs, else the unit's ExecStart
+#   flags: u (unified JS server), m (/media/system: block by name only),
+#          j=<jail>, L=dynamic|static|unified|jailed (the expected launch model)
+# Other fields:
+#   option    options.toml id
+#   action    block (default), release (earlier versions blocked it; the
+#             spec is as it was), never (see [never])
+#   legacy    the 1.4 module that carries it (tools/kb.py checks parity)
+#   since     first build that ships it; "planned" = not yet
+#   needs_test  not yet verified on a TV
+#   what, sends, breaks, note, evidence (paths in the research repo)
+
+# =================================================================== acr ==
+[[service]]
+id = "acr"
+option = "acr"
+legacy = "acr"
+since = "1.2"
+binary = "?"
+comm = "acr2"
+ls2 = "com.webos.service.acr"
+flags = ["L=dynamic"]
+what = "ACR daemon: captures TV output audio (not the microphone) from broadcast and HDMI and fingerprints it with the Alphonso plugin; has a video-frame path."
+sends = "Fingerprints, nearby Wi-Fi BSSIDs, wired MAC, HDMI device identity and the advertising ID to Alphonso (prov-lg.alphonso.tv, eulacheck.alphonso.tv and hosts it learns)."
+evidence = ["2026-09-25-service-audit/reports/acr-ads.md"]
+
+[[service]]
+id = "adoverlay"
+option = "acr"
+legacy = "acr"
+since = "1.2"
+binary = "?"
+comm = "adoverlay-service"
+ls2 = "com.webos.service.adoverlay"
+flags = ["L=dynamic"]
+what = "Shoppable and 'Live Promotion' overlays keyed on ACR (Alphonso adoverlay, libshopping)."
+sends = "Through ACR and lgshop_secure."
+evidence = ["2026-09-25-service-audit/reports/acr-ads.md"]
+
+[[service]]
+id = "adoverlay-legacy"
+option = "acr"
+legacy = "acr"
+since = "1.2"
+unit = "adoverlay.service"
+binary = "?"
+comm = "adoverlay"
+what = "Older name of the ad overlay service; absent on every surveyed image, kept for older firmware."
+
+[[service]]
+id = "livepick-plus"
+option = "acr"
+legacy = "acr"
+since = "1.2"
+binary = "?"
+comm = "livepick-plus"
+ls2 = "com.webos.service.livepickplus"
+flags = ["L=dynamic"]
+what = "Turns ACR and guide data into notice-bar offers (food delivery, shopping). On webOS 11 it grabs Live TV and HDMI frames and posts them to EdgeVideo AI for shoppable 'moments'."
+sends = "Offers; on webOS 11 frames to moments-edge-service.edgevideo.ai (inferred)."
+evidence = ["2026-09-25-service-audit/reports/acr-ads.md", "firmware-survey/results/webos11-c5.md"]
+
+[[service]]
+id = "admanager"
+option = "ads"
+legacy = "acr"
+since = "1.2"
+binary = "?"
+comm = "admanager"
+ls2 = "com.webos.service.admanager"
+flags = ["L=dynamic"]
+what = "Advertising ID (IFA), ad cookie, fck, click tracking; launches the consent manager and the full-screen ad app."
+sends = "info.lgsmartad.com, directly with the gateway's headers."
+breaks = "Settings' 'reset advertising ID' and Do-Not-Sell update fail silently."
+evidence = ["2026-09-25-service-audit/reports/acr-ads.md"]
+
+[[service]]
+id = "lsa"
+option = "ads"
+since = "1.4"
+binary = "/usr/sbin/com.webos.service.lsa"
+ls2 = "com.webos.service.lsa"
+flags = ["L=dynamic"]
+what = "'Log service for the advertisement': downloads an encrypted Python script through the Content Store's resource channel and runs it with any-luna, any-HTTP rights. The script collects foreground-app sessions, channels, installs, IFA/LMT and the MAC."
+sends = "<ric>.api.adts.lgtvcommon.com (inactive on the C5 only because of a US-only check and server config)."
+note = "comm is com.webos.servi, shared by many daemons: matched by executable only."
+evidence = ["2026-09-25-service-audit/README.md#4"]
+
+[[service]]
+id = "contentminer"
+option = "promos"
+legacy = "acr"
+since = "1.2"
+unit = "contentminer.service"
+binary = "?"
+comm = "contentminer"
+ls2 = "com.webos.service.contentminer"
+flags = ["L=static"]
+what = "Downloads the per-app preview rows on the Home screen and tells LG the installed-app list. Not ACR."
+sends = "homeprv_secure."
+evidence = ["2026-09-25-service-audit/reports/acr-ads.md"]
+
+[[service]]
+id = "objectdetection"
+option = "acr"
+legacy = "acr"
+action = "release"
+since = "1.2.4"
+binary = "?"
+comm = "objectdetection"
+what = "On-device text and sign-language detection (accessibility); no network. Blocked by versions before 1.2.4."
+
+[[service]]
+id = "objectdetectionutilizer"
+option = "acr"
+legacy = "acr"
+action = "release"
+since = "1.2.4"
+binary = "?"
+comm = "objectdetectionutilizer"
+what = "Caption positioning for objectdetection; no network."
+
+# ============================================================= telemetry ==
+[[service]]
+id = "uploadd"
+option = "diagnostics"
+legacy = "telemetry"
+since = "1.2"
+unit = "uploadd.service"
+binary = "?"
+comm = "uploadd"
+ls2 = "com.palm.uploadd"
+flags = ["L=dynamic"]
+what = "Uploads crash and analytics reports."
+sends = "Usage logs, process lists, MAC/IP, eMMC and TV serial to <CC>.rdx2.nextlgsdp.com; developer logs to rdl.lgtvcommon.com."
+evidence = ["2026-09-25-service-audit/reports/telemetry.md"]
+
+[[service]]
+id = "rdxd"
+option = "diagnostics"
+legacy = "telemetry"
+since = "1.2"
+unit = "rdxd.service"
+binary = "?"
+comm = "rdxd"
+ls2 = "com.webos.rdxd"
+flags = ["L=static"]
+what = "Builds crash and analytics reports (the last 40 KB of the system log goes into every crash report)."
+sends = "Through uploadd."
+
+[[service]]
+id = "rdx_reporter"
+option = "diagnostics"
+legacy = "telemetry"
+since = "1.2"
+binary = "?"
+comm = "rdx_reporter"
+what = "Command-line tool that makes one report; no caller in the firmware."
+
+[[service]]
+id = "remotelogger"
+option = "diagnostics"
+legacy = "telemetry"
+since = "1.2"
+unit = "remotelogger.service"
+binary = "?"
+comm = "remotelogger"
+what = "Crash backtrace helper; no network code (its dumps are what uploadd sends)."
+
+[[service]]
+id = "nudge"
+option = "promos"
+legacy = "telemetry"
+since = "1.2"
+unit = "nudge.service"
+binary = "?"
+comm = "nudge"
+ls2 = "com.webos.service.nudge"
+flags = ["L=static"]
+what = "'AI Recommendation' tips from your app and channel usage; on webOS 11 it fetches server-side audience segments (upp) to target them."
+sends = "nudge_secure; webOS 11 upp and sdp_aiplatform_proactiveai."
+note = "Static: calls to it wait while it is stopped (seen: more than 15 s)."
+evidence = ["2026-09-25-service-audit/reports/telemetry.md", "firmware-survey/results/webos11-c5.md"]
+
+[[service]]
+id = "sdp-server-notice"
+option = "promos"
+legacy = "telemetry"
+since = "1.2"
+binary = "?"
+comm = "sdp-server-notice"
+ls2 = "com.webos.service.sdpservernotice"
+flags = ["L=dynamic"]
+what = "Periodic poll for LG server notices and 'alarm nudge' popups."
+
+[[service]]
+id = "service-logger"
+option = "usage-logs"
+legacy = "telemetry"
+since = "1.2"
+unit = "service-logger.service"
+binary = "?"
+comm = "service-logger"
+ls2 = "com.webos.service.logger"
+flags = ["L=static"]
+what = "Runs LG's usage-logging rules (first use of each app, HDMI brands, game inputs, volume, picture mode); downloads new rule bundles and runs them with python3 as root."
+sends = "System log records, uploaded through sdp_logging."
+evidence = ["2026-09-25-service-audit/reports/telemetry.md"]
+
+[[service]]
+id = "user-context-manager"
+option = "usage-logs"
+legacy = "telemetry"
+since = "1.2"
+unit = "user-context-manager.service"
+binary = "?"
+comm = "user-context-manager"
+ls2 = "com.webos.service.usercontextmanager"
+flags = ["L=static"]
+what = "Per-account app and channel watch history; ranks recent apps for Home; monthly report toast."
+sends = "nudge_log_secure."
+breaks = "Settings' 'reset usage data'."
+
+[[service]]
+id = "ocpservice"
+option = "usage-logs"
+legacy = "telemetry"
+since = "1.2"
+unit = "ocp.service"
+binary = "?"
+comm = "ocpservice"
+ls2 = "com.webos.service.ocp"
+flags = ["L=static"]
+what = "OLED Care journal: panel hours, pixel-refresher runs, picture settings, device ID. Not consent-gated."
+sends = "ocp.lgtviot.com, directly."
+
+[[service]]
+id = "ftms"
+option = "usage-logs"
+legacy = "telemetry"
+since = "1.2"
+unit = "ftms.service"
+binary = "?"
+comm = "ftms"
+ls2 = "com.webos.service.ftms"
+flags = ["L=static"]
+what = "Bluetooth LE fitness-machine detector; on webOS 11 it uploads workouts with heart rate and account ID in Korea and the US."
+
+[[service]]
+id = "scd-service"
+option = "usage-logs"
+since = "1.4"
+binary = "/usr/sbin/scd-service"
+comm = "scd-service"
+ls2 = "com.webos.service.scd"
+flags = ["L=dynamic"]
+what = "OCRs HDMI channel banners (Tesseract) for the watch logger; off by server config today."
+
+[[service]]
+id = "user-intent-manager"
+option = "usage-logs"
+since = "1.4"
+binary = "/usr/sbin/user-intent-manager"
+comm = "user-intent-manager"
+ls2 = "com.webos.service.userintentmanager"
+flags = ["L=dynamic"]
+what = "Local per-user intent profile from the foreground app, HDMI signal, channel and EPG, power reasons and remote pairing; feeds nudges. Started at every boot on webOS 11."
+note = "Blocked on the C5, Home and Settings still open quickly (2026-09-26)."
+
+# ================================================================ remote ==
+[[service]]
+id = "remotediag"
+option = "remote-support"
+legacy = "remote"
+since = "1.2"
+unit = "remotediag.service"
+binary = "?"
+comm = "remotediag"
+ls2 = "com.webos.service.remotediag"
+flags = ["L=dynamic"]
+what = "RemoteOne: LG support can push SSH keys, install dropbear, capture the screen, send keys, reboot and factory-reset the TV."
+sends = "rone-*.lge.com."
+
+# ================================================================= voice ==
+[[service]]
+id = "voiceinput_hidraw"
+option = "voice"
+legacy = "voice"
+since = "1.2"
+binary = "?"
+comm = "voiceinput_hidraw"
+ls2 = "com.webos.service.voiceinput.hidraw"
+flags = ["L=dynamic"]
+what = "Reads the Magic Remote microphone (a Bluetooth HID stream)."
+
+[[service]]
+id = "voiceinput_sound"
+option = "voice"
+legacy = "voice"
+since = "1.2"
+binary = "?"
+comm = "voiceinput_sound"
+ls2 = "com.webos.service.voiceinput.sound"
+flags = ["L=dynamic"]
+what = "Reads the built-in far-field microphone (C and G OLEDs only)."
+
+[[service]]
+id = "voiceinput_preprocessor"
+option = "voice"
+legacy = "voice"
+since = "1.2"
+binary = "?"
+comm = "voiceinput_preprocessor"
+ls2 = "com.webos.service.voiceinput.preprocessor"
+flags = ["L=dynamic"]
+what = "Prepares far-field audio for the wake words; sends device headers at boot."
+
+[[service]]
+id = "voiceinput_network"
+option = "voice"
+legacy = "voice"
+since = "1.2"
+binary = "?"
+comm = "voiceinput_network"
+ls2 = "com.webos.service.voiceinput.network"
+flags = ["L=dynamic"]
+what = "Receives microphone audio from a paired phone."
+
+[[service]]
+id = "voiceclick"
+option = "voice"
+legacy = "voice"
+since = "1.2"
+binary = "?"
+comm = "voiceclick"
+ls2 = "com.webos.service.voiceclick"
+flags = ["L=dynamic"]
+what = "Voice 'click what's on screen': captures the screen and finds clickable areas locally."
+
+[[service]]
+id = "trigger_alexa"
+option = "voice"
+legacy = "voice"
+since = "1.2"
+binary = "?"
+comm = "trigger_alexa"
+ls2 = "com.webos.service.trigger.alexa"
+flags = ["L=dynamic"]
+what = "Always-listening Alexa wake word."
+
+[[service]]
+id = "trigger_thinq"
+option = "voice"
+legacy = "voice"
+since = "1.2"
+binary = "?"
+comm = "trigger_thinq"
+ls2 = "com.webos.service.trigger.thinq"
+flags = ["L=dynamic"]
+what = "Always-listening ThinQ wake word."
+
+[[service]]
+id = "alexa-adapter"
+option = "voice"
+legacy = "voice"
+since = "1.2"
+binary = "?"
+comm = "amazon-alexa-adapter"
+ls2 = "amazon.alexa.adapter.plugin"
+flags = ["L=jailed", "j=amazon.alexa.adapter"]
+what = "Alexa built-in (jailed). The 'amazon' jail is Prime Video, not Alexa."
+
+[[service]]
+id = "thinqai-adapter"
+option = "voice"
+legacy = "voice"
+since = "1.2"
+binary = "?"
+comm = "lg.thinqai.adapter"
+ls2 = "lg.thinqai.adapter"
+flags = ["L=jailed", "j=lg.thinqai.adapter"]
+what = "ThinQ AI assistant (jailed): sends voice audio directly to LG's speech servers; Voice ID with the account ID; on webOS 11 the LLM assistant."
+sends = "he-kr-ai.lgthinq.com/voice/stt/…"
+evidence = ["2026-09-25-service-audit/reports/voice-mic.md"]
+
+[[service]]
+id = "thinqcn-adapter"
+option = "voice"
+since = "1.4"
+binary = "/usr/sbin/lg-thinqcn-adapter"
+comm = "lg-thinqcn-adapter"
+ls2 = "lg.thinqcn.adapter"
+flags = ["L=jailed", "j=lg.thinqcn.adapter"]
+what = "China's ThinQ AI voice stack (iFlytek), jailed like thinqai; webOS 11, zh-Hans-CN only."
+
+[[service]]
+id = "nlpmanagercn"
+option = "voice"
+since = "1.4"
+binary = "/usr/sbin/nlpmanagercn"
+comm = "nlpmanagercn"
+ls2 = "com.webos.service.nlpmanagercn"
+flags = ["L=dynamic"]
+what = "China's voice NLP service (webOS 11)."
+
+[[service]]
+id = "sound-aware-adapter"
+option = "voice"
+since = "1.4"
+binary = "/usr/sbin/sound-aware-adapter"
+comm = "sound-aware-adapter"
+ls2 = "com.webos.service.soundawareadapter"
+flags = ["L=dynamic"]
+what = "Ultrasonic presence sensing: plays a ~21 kHz tone and streams the far-field microphone for Doppler motion detection (webOS 11; dormant on the C5)."
+
+[[service]]
+id = "airessrvallocator"
+option = "voice"
+legacy = "voice"
+action = "release"
+since = "1.4"
+binary = "?"
+comm = "airessrvallocator"
+ls2 = "com.webos.service.airessrvallocator"
+flags = ["L=static"]
+what = "NPU allocator with no caller in the firmware; not voice. Gone on webOS 11."
+
+[[service]]
+id = "voice-performer"
+option = "voice"
+legacy = "voice"
+since = "1.2"
+binary = "/usr/sbin/performer"
+comm = "performer"
+ls2 = "com.webos.service.voice.performer.plugin"
+flags = ["L=jailed", "j=com.webos.service.voice.performer"]
+what = "Carries out voice intents (jailed). On webOS 10 it also recognises actors from a frame capture uploaded to wau.lgtvcommon.com; webOS 11 dropped that."
+
+[[service]]
+id = "voiceconductor"
+option = "voice"
+legacy = "voice"
+action = "release"
+since = "1.2.4"
+binary = "?"
+comm = "voiceconductor"
+what = "Orchestrates voice requests. Released: Settings asks it for the supported languages at startup, and a call to a blocked copy never returns."
+
+[[service]]
+id = "voiceconductor-block"
+option = "voice-core"
+since = "1.4"
+binary = "/usr/sbin/voiceconductor"
+comm = "voiceconductor"
+ls2 = "com.webos.service.voiceconductor"
+flags = ["L=static"]
+what = "Voice orchestration; pushes the LG account ID to ThinQ AI and syncs voice server config."
+breaks = "Settings' Date & Time page (it waits on this service)."
+
+[[service]]
+id = "voiceinput-hub"
+option = "voice-core"
+since = "1.4"
+binary = "/usr/sbin/voiceinput"
+comm = "voiceinput"
+ls2 = "com.webos.service.voiceinput"
+flags = ["L=static"]
+what = "The voice input hub Settings and Home query."
+breaks = "Settings and Home open slowly (8 s instead of 1.2 s)."
+
+[[service]]
+id = "nlpmanager"
+option = "voice-core"
+since = "1.4"
+binary = "/usr/sbin/nlpmanager"
+comm = "nlpmanager"
+ls2 = "com.webos.service.nlpmanager"
+flags = ["L=dynamic"]
+what = "Search and NLP: sends search queries, the current programme and the NLP ID to LG; on webOS 11 the AI Concierge context."
+breaks = "Search."
+
+# ================================================================= cloud ==
+[[service]]
+id = "iot-client"
+option = "thinq"
+legacy = "cloud"
+since = "1.2"
+unit = "iot-client.service"
+binary = "/usr/palm/services/com.webos.service.iotclient/iot-client"
+ls2 = "com.webos.service.iotclient"
+flags = ["L=dynamic"]
+what = "ThinQ MQTT link (connect-client.lgthinq.com)."
+
+[[service]]
+id = "iot-client-bin"
+option = "thinq"
+legacy = "cloud"
+since = "1.2"
+binary = "/usr/bin/iot-client"
+what = "Second copy of the ThinQ client binary."
+
+[[service]]
+id = "iot-proxy"
+option = "thinq"
+legacy = "cloud"
+since = "1.2"
+binary = "?"
+comm = "iot-proxy"
+ls2 = "com.webos.service.iotproxy"
+flags = ["L=dynamic"]
+what = "ThinQ HTTPS proxy for the Home Hub (kr.lgeapi.com)."
+
+[[service]]
+id = "pushclient"
+option = "thinq"
+legacy = "cloud"
+since = "1.2"
+unit = "com.webos.service.pushclient.service"
+binary = "/usr/sbin/com.webos.service.pushclient"
+ls2 = "com.webos.service.pushclient"
+flags = ["L=static"]
+what = "LG push channel over AWS IoT MQTT with a device certificate; LG marketing pushes; sends the MACs. Renews its certificate in the boot window."
+
+[[service]]
+id = "ruleengine"
+option = "thinq"
+legacy = "cloud"
+since = "1.2"
+unit = "com.webos.service.ruleengine.service"
+binary = "/usr/sbin/com.webos.service.ruleengine"
+ls2 = "com.webos.service.ruleengine"
+flags = ["L=static"]
+what = "ThinQ and Matter routines, synced with LG's cloud."
+
+[[service]]
+id = "homeconnect"
+option = "thinq"
+legacy = "cloud"
+since = "1.2"
+binary = "/usr/palm/services/com.webos.service.homeconnect/main.js"
+ls2 = "com.webos.service.homeconnect"
+flags = ["u", "L=unified"]
+what = "Home Hub device manager (JS, unified server); caches the LG account token in /mnt/lg/cmn_data/homeconnect/tv.json. Gone on webOS 11 (iotframework)."
+
+[[service]]
+id = "iotframework"
+option = "thinq"
+since = "1.4"
+binary = "/usr/palm/services/com.webos.iotframework/com.webos.iotframework"
+comm = "com.webos.iotframework"
+ls2 = "com.webos.iotframework"
+flags = ["L=dynamic"]
+what = "webOS 11's native smart-home hub (ThinQ, Matter, UEI, Google Home, Homey)."
+note = "comm would be com.webos.iotfr (truncated); matched by executable."
+
+[[service]]
+id = "homey-bridge"
+option = "thinq"
+since = "1.4"
+binary = "/usr/sbin/webos-homey-bridge"
+comm = "webos-homey-bridge"
+ls2 = "com.webos.service.homeybridge"
+flags = ["L=dynamic"]
+what = "Homey bridge: a client-certificate TLS link relaying Zigbee, Thread and Matter (webOS 11; needs LG's USB dongle)."
+
+[[service]]
+id = "homey-matter"
+option = "thinq"
+since = "1.4"
+binary = "/usr/sbin/homey-matter"
+comm = "homey-matter"
+ls2 = "com.webos.service.homeymatter"
+flags = ["L=dynamic"]
+what = "Homey's Matter controller (webOS 11)."
+
+[[service]]
+id = "matter"
+option = "thinq"
+legacy = "cloud"
+since = "1.2"
+binary = "/usr/palm/services/com.webos.service.matter/chip-service"
+ls2 = "com.webos.service.matter"
+flags = ["L=dynamic"]
+what = "Matter commissioner."
+
+[[service]]
+id = "mycar"
+option = "thinq"
+legacy = "cloud"
+since = "1.2"
+unit = "com.webos.service.mycar.service"
+binary = "/usr/sbin/com.webos.service.mycar"
+ls2 = "com.webos.service.mycar"
+flags = ["L=static"]
+what = "Connected-car features over push topics. Gone on webOS 11."
+
+[[service]]
+id = "buddyconnector"
+option = "buddy-sports"
+legacy = "cloud"
+since = "1.2"
+unit = "com.webos.service.buddyconnector.service"
+binary = "/usr/palm/services/com.webos.service.buddyconnector/com.webos.service.buddyconnector"
+ls2 = "com.webos.service.buddyconnector"
+flags = ["L=dynamic"]
+what = "LG Buddy: a linked family member can control the TV, get SOS alerts and video-call (<ric>.buddy.lgtviot.com)."
+
+[[service]]
+id = "sportsalarm"
+option = "buddy-sports"
+legacy = "cloud"
+since = "1.2"
+binary = "?"
+comm = "sportsalarm"
+ls2 = "com.webos.service.sportsalarm"
+flags = ["L=dynamic"]
+what = "Sports score alerts (MQTT) and their sponsored popups."
+
+[[service]]
+id = "sportsalert"
+option = "buddy-sports"
+legacy = "cloud"
+since = "1.2"
+binary = "/usr/palm/services/com.webos.service.sportsalert/index.js"
+ls2 = "com.webos.service.sportsalert"
+flags = ["u", "L=unified"]
+what = "Sports alerts (JS, unified server)."
+
+[[service]]
+id = "google-home"
+option = "google-home"
+legacy = "cloud"
+since = "1.2"
+unit = "google-home-controller.service"
+binary = "?"
+comm = "google-home-controller"
+flags = ["L=static"]
+what = "Installs and runs the Google Home hub runtime; copies the Chromecast identity into it."
+
+[[service]]
+id = "ghp-runtime"
+option = "google-home"
+since = "1.4"
+binary = "/media/system/apps/usr/palm/services/com.webos.ghp.runtime/com.webos.ghp.runtime"
+ls2 = "com.webos.ghp.runtime"
+flags = ["m", "L=jailed", "j=com.webos.ghp"]
+what = "The Google Home hub runtime itself, installed on /media/system (world-writable directory)."
+
+[[service]]
+id = "avahi-daemon"
+option = "miracast"
+legacy = "cloud"
+since = "1.2"
+unit = "avahi-daemon.service"
+binary = "?"
+comm = "avahi-daemon"
+what = "DNS-SD publishing for Screen Share over the LAN (Windows) and the Google Home hub. AirPlay (mdnsd) and Chromecast have their own."
+note = "Moved from Google Home hub to Screen Share in 1.4.17: Miracast needs its Luna front end (avahi-adaptor) at start-up."
+
+[[service]]
+id = "avahi-adaptor"
+option = "miracast"
+legacy = "cloud"
+since = "1.2"
+unit = "avahi-adaptor.service"
+binary = "?"
+comm = "avahi-adaptor"
+ls2 = "com.webos.service.dnssd"
+flags = ["L=static"]
+what = "Luna front end of avahi (com.webos.service.dnssd)."
+note = "Static, so a call to it waits while it is stopped. Miracast calls dnssd at start-up: a Miracast started while avahi is stopped never turns Wi-Fi Direct discovery back on (C5: the TV left the Smart View list after an undo). Stopped only together with Miracast; units restart in name order, avahi first."
+
+[[service]]
+id = "familycare"
+option = "thinq"
+legacy = "cloud"
+action = "release"
+since = "1.4"
+unit = "com.webos.service.familycare.service"
+binary = "/usr/palm/services/com.webos.service.familycare/index.js"
+argmatch = "familycare/index.js"
+what = "Offline screen-time limits; no network. Released."
+
+[[service]]
+id = "alwaysready"
+option = "thinq"
+legacy = "cloud"
+action = "release"
+since = "1.4"
+unit = "alwaysready.service"
+binary = "?"
+comm = "alwaysready"
+what = "Always Ready display and motion wake; local. Released."
+
+[[service]]
+id = "ai-inference"
+option = "thinq"
+legacy = "cloud"
+action = "release"
+since = "1.4"
+unit = "ai-inference-manager.service"
+binary = "?"
+comm = "ai-inference-manager"
+what = "The NPU arbiter behind AI Picture, AI Sound and sign-language detection. Released."
+
+[[service]]
+id = "wowplay"
+option = "thinq"
+legacy = "cloud"
+action = "release"
+since = "1.4"
+unit = "wowplay.service"
+binary = "?"
+comm = "wowplay"
+what = "WOWCAST and Dolby FlexConnect speakers. Released."
+
+# =============================================================== casting ==
+[[service]]
+id = "chromecast-prov"
+option = "cast"
+legacy = "cloud"
+since = "1.2"
+unit = "chromecast-provisioning.service"
+binary = "?"
+comm = "chromecast-provisioning"
+ls2 = "com.webos.service.chromecast.provisioning"
+flags = ["L=static"]
+what = "Installs, starts and stops the Chromecast receiver and shows its terms popup."
+
+[[service]]
+id = "chromecast-cell"
+option = "cast"
+since = "1.4"
+binary = "/media/system/apps/usr/palm/services/com.webos.chromecast.cell/com.webos.chromecast.cell"
+ls2 = "com.webos.chromecast.cell"
+flags = ["m", "L=jailed", "j=com.webos.chromecast"]
+what = "Chromecast receiver (jailed, uid 5081, :8008/8009/8443); contacted Google before its terms were accepted."
+
+[[service]]
+id = "chromecast-core"
+option = "cast"
+since = "1.4"
+binary = "/media/system/apps/usr/palm/services/com.webos.chromecast.core/com.webos.chromecast.core"
+ls2 = "com.webos.chromecast.core"
+flags = ["m", "L=jailed", "j=com.webos.chromecast"]
+what = "Chromecast core (Cast shell)."
+
+[[service]]
+id = "chromecast-log"
+option = "cast"
+since = "1.4"
+binary = "/media/system/apps/usr/palm/services/com.webos.chromecast.log/com.webos.chromecast.log"
+ls2 = "com.webos.chromecast.log"
+flags = ["m", "L=jailed", "j=com.webos.chromecast"]
+what = "Chromecast logging."
+
+[[service]]
+id = "airplay"
+option = "airplay"
+since = "1.4"
+binary = "/usr/sbin/airplay"
+comm = "airplay"
+ls2 = "airplay.service"
+flags = ["L=dynamic"]
+what = "AirPlay receiver (tcp 7000)."
+
+[[service]]
+id = "airplay-adaptor"
+option = "airplay"
+since = "1.4"
+unit = "airplay-adaptor.service"
+binary = "/usr/sbin/airplay-adaptor"
+comm = "airplay-adaptor"
+ls2 = "com.webos.service.airplayadaptor"
+flags = ["L=static"]
+what = "AirPlay integration and provisioning (sdp_init, sdp_airplay)."
+
+[[service]]
+id = "mfi"
+option = "airplay"
+since = "1.4"
+unit = "mfi.service"
+binary = "/usr/sbin/mfi"
+comm = "mfi"
+ls2 = "com.webos.service.mfi"
+flags = ["L=dynamic"]
+what = "Apple MFi key provisioning (sdp_airplay)."
+
+[[service]]
+id = "miracast"
+option = "miracast"
+since = "1.4"
+unit = "miracast.service"
+binary = "/usr/sbin/miracast"
+comm = "miracast"
+ls2 = "com.webos.service.miracast"
+flags = ["L=static"]
+what = "Miracast sink."
+
+[[service]]
+id = "appcasting"
+option = "phone"
+legacy = "cloud"
+since = "1.2"
+unit = "appcasting.service"
+binary = "?"
+comm = "appcasting"
+ls2 = "com.webos.service.appcasting"
+flags = ["L=static"]
+what = "Turns a phone screen share into an app deeplink; LG can deliver a Python script it runs as root."
+
+[[service]]
+id = "dial-discovery"
+option = "phone"
+legacy = "cloud"
+since = "1.2"
+binary = "/usr/palm/services/com.webos.service.dial/discovery-server.js"
+ls2 = "com.webos.service.dial"
+flags = ["u", "L=unified"]
+what = "DIAL server (JS, unified server): phone apps launch YouTube or Netflix on the TV; unauthenticated app launch and power-off from the LAN."
+
+[[service]]
+id = "lglink"
+option = "phone"
+since = "1.4"
+ls2 = "com.webos.service.lglink"
+flags = ["u", "L=unified"]
+what = "LG Link (webOS 11): file transfer and 'gramlink' with LG PCs and phones; insecure gRPC on :50051 and socket.io on :50052."
+
+[[service]]
+id = "iconnectivity"
+option = "universal-control"
+since = "1.4"
+binary = "/usr/sbin/iconnectivity"
+comm = "iconnectivity"
+ls2 = "com.webos.service.ics"
+flags = ["L=dynamic"]
+what = "UEI QuickSet (Universal Control): IR blaster, CEC identification, LAN device discovery and control; uploads device signatures to UEI's cloud; reads usage history."
+breaks = "Universal Control; Settings opens in about 8 s."
+evidence = ["2026-09-25-service-audit/reports/cloud.md"]
+
+[[service]]
+id = "lgchannelurl"
+option = "lgchannels"
+since = "1.4"
+binary = "/usr/sbin/lgchannelurl"
+comm = "lgchannelurl"
+ls2 = "com.webos.service.lgchannelurl"
+flags = ["L=dynamic"]
+what = "Fills LG Channels' ad-insertion URLs with LGUDID, IFA, zipcode, IP and consent flags (webOS 6 and 11); can download a replacement Python script."
+evidence = ["firmware-survey/results/webos11-c5.md"]
+
+# ================================================================= never ==
+# Hard: breaks the TV, risks the panel, or is shared infrastructure. No
+# option may block these. Soft never-touch services (voiceconductor, the
+# voice hub, iconnectivity) are ordinary records above, only allowed in
+# Lockdown options.
+# The webOS generations Own Your Glass has been run on (the C5 at 10.3). On
+# a generation it knows from firmware only, static services (always-on units
+# other daemons call and wait for) are left running: a caller of a stopped
+# static service can hang, and only a run on a TV shows which do.
+[run_on]
+generations = ["10.3"]
+
+[never]
+paths = [
+  "/bin/sh", "/bin/bash", "/bin/busybox", "/usr/bin/busybox", "/bin/busybox.*",
+  "/usr/bin/luna-send", "/usr/bin/iotjs", "/usr/bin/node", "/usr/bin/run-iot-js-service",
+  "/usr/bin/run-js-service", "/usr/bin/run-service", "/usr/bin/jailer", "/usr/bin/python3*",
+  "/usr/bin/socat", "/usr/bin/jsservicelauncher", "/usr/bin/flutter-client",
+  "/usr/sbin/ls-hubd", "/usr/sbin/sdx", "/usr/sbin/tvdataexchanger",
+  "/usr/sbin/pacrunner", "/usr/sbin/crashd", "/usr/sbin/eplmanager", "/usr/sbin/captureservice",
+  "/dev/hidraw*", "/usr/bin/systemctl", "/bin/systemctl", "/lib/systemd/systemd",
+  "/usr/lib/systemd/systemd", "/usr/palm/services/jsservicelauncher*",
+]
+reasons = [
+  "sdx: binding it silently kills the Settings UI; the gateway is filtered by table instead",
+  "eplmanager: OLED pixel care; stopping it risks the panel",
+  "captureservice: shared by pixel care and every screen capture",
+  "iconnectivity (soft): Universal Control and the IR blaster; binding it broke external-speaker control and made Settings take ~8 s",
+  "/dev/hidraw*: every remote button rides on it",
+  "interpreters and launchers: shared by everything",
+]
+# soft: costs features the owner may give up; only an option in no preset
+# but Lockdown may touch these (tools/kb.py checks)
+soft_paths = ["/usr/sbin/iconnectivity"]
+ls2 = [
+  "org.webosbrew.*", "org.ownyourglass.*", "com.palm.*", "com.webos.service.jsserver",
+  "com.webos.service.secondscreen.gateway", "com.webos.service.settingsui", "com.webos.service.sdx",
+  "com.webos.service.voiceconductor", "com.webos.service.voiceinput", "com.webos.service.ics",
+  "com.webos.service.ics.*", "com.webos.service.eulaservice", "com.webos.service.accountmanager",
+  "com.webos.service.capture", "com.webos.service.servicemanager", "com.webos.service.systemprofile",
+  "com.webos.settingsservice", "com.webos.service.settings", "com.webos.applicationManager",
+  "com.webos.service.applicationmanager", "com.webos.bootManager", "com.webos.notification",
+]
+ls2_allow = ["com.palm.uploadd"]

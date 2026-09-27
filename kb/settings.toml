@@ -1,0 +1,277 @@
+# System settings OYG sets through LG's settings service, by option. The
+# previous value is recorded the first time a key is changed and put back on
+# restore. Keys a firmware does not have are skipped (lib/settings.sh).
+# legacy = "consent" marks the keys 1.4's consent module sets (parity).
+# Values are JSON as settingsservice takes them.
+
+[[setting]]
+category = "general"
+key = "homePromotion"
+value = '"off"'
+option = "promos"
+legacy = "consent"
+
+[[setting]]
+category = "general"
+key = "personalRecommend"
+value = '{"value":"off","changedByUser":true}'
+option = "promos"
+legacy = "consent"
+
+[[setting]]
+category = "general"
+key = "screenSaverAd"
+value = '"off"'
+option = "ads"
+legacy = "consent"
+
+[[setting]]
+category = "general"
+key = "aiNudge"
+value = '"off"'
+option = "promos"
+legacy = "consent"
+
+[[setting]]
+category = "general"
+key = "aiSettingsNudge"
+value = '"off"'
+option = "promos"
+legacy = "consent"
+
+[[setting]]
+category = "general"
+key = "adCookie"
+value = '"off"'
+option = "ads"
+legacy = "consent"
+
+[[setting]]
+category = "general"
+key = "customizedAd"
+value = '"off"'
+option = "ads"
+legacy = "consent"
+
+[[setting]]
+category = "general"
+key = "lmt"
+value = '"on"'
+option = "ads"
+legacy = "consent"
+note = "Limit ad tracking."
+
+[[setting]]
+category = "general"
+key = "doNotSellMyPersonalInformation"
+value = '"on"'
+option = "ads"
+legacy = "consent"
+
+[[setting]]
+category = "general"
+key = "sportsAlarm"
+value = '"off"'
+option = "buddy-sports"
+legacy = "consent"
+
+[[setting]]
+category = "general"
+key = "lifeAlarm"
+value = '"off"'
+option = "promos"
+legacy = "consent"
+
+[[setting]]
+category = "general"
+key = "welcomeFeature"
+value = '"off"'
+option = "promos"
+legacy = "consent"
+
+[[setting]]
+category = "option"
+key = "livePlus"
+value = '"off"'
+option = "acr"
+legacy = "consent"
+
+[[setting]]
+category = "option"
+key = "usageCare"
+value = 'false'
+option = "usage-logs"
+legacy = "consent"
+
+[[setting]]
+category = "option"
+key = "dbgLogUpload"
+value = 'false'
+option = "diagnostics"
+legacy = "consent"
+
+[[setting]]
+category = "option"
+key = "faultLogUpload"
+value = 'false'
+option = "diagnostics"
+legacy = "consent"
+
+[[setting]]
+category = "option"
+key = "watchedListCollection"
+value = '"off"'
+option = "usage-logs"
+legacy = "consent"
+
+[[setting]]
+category = "option"
+key = "thirdPartyCookie"
+value = '"off"'
+option = "ads"
+legacy = "consent"
+
+# ------------------------------------------------------------ planned --
+[[setting]]
+category = "option"
+key = "livePromotion"
+value = '"off"'
+option = "acr"
+since = "1.4"
+note = "On by default; shoppable 'Live Promotion' overlays."
+
+[[setting]]
+category = "option"
+key = "webOSPromotionVideo"
+value = '"off"'
+option = "promos"
+since = "1.4"
+
+[[setting]]
+category = "other"
+key = "contentRecommendation"
+value = '"off"'
+option = "promos"
+since = "1.4"
+
+[[setting]]
+category = "general"
+key = "aiChannel"
+value = '"off"'
+option = "promos"
+since = "1.4"
+
+[[setting]]
+category = "general"
+key = "voiceLongDistance"
+value = '"off"'
+option = "voice"
+since = "1.4"
+note = "Far-field (hands-free) voice; on by default."
+
+[[setting]]
+category = "option"
+key = "hbbTvDnt"
+value = '"on"'
+option = "hbbtv-tracking"
+since = "1.4"
+note = "Off by default on the C5."
+
+[[setting]]
+category = "option"
+key = "hbbTvDeviceId"
+value = '"offByUser"'
+option = "hbbtv-tracking"
+since = "1.4"
+note = "On by default on the C5."
+
+[[setting]]
+category = "option"
+key = "hbbTV"
+value = '"off"'
+option = "hbbtv"
+since = "1.4"
+
+[[setting]]
+category = "general"
+key = "autoBackupEnabled"
+value = 'false'
+option = "backup-presence"
+since = "1.4"
+note = "webOS 11: settings backup to the LG account."
+
+[[setting]]
+category = "option"
+key = "homeSensePresence"
+value = '"off"'
+option = "backup-presence"
+since = "1.4"
+
+[[setting]]
+category = "option"
+key = "homeSenseAbsence"
+value = '"off"'
+option = "backup-presence"
+since = "1.4"
+
+[[setting]]
+category = "option"
+key = "homeSenseAccount"
+value = '"off"'
+option = "backup-presence"
+since = "1.4"
+
+[[setting]]
+category = "network"
+key = "bleAdvertisingOnOff"
+value = '"off"'
+option = "thinq"
+since = "1.4"
+note = "The TV's BLE beacon for the ThinQ phone app's onboarding."
+
+[[setting]]
+category = "option"
+key = "channelplus"
+value = '"off"'
+option = "lgchannels"
+since = "1.4"
+
+[[setting]]
+category = "option"
+key = "lgChannelAutoStart"
+value = '"off"'
+option = "lgchannels"
+since = "1.4"
+note = "webOS 11; on by default."
+
+[[setting]]
+category = "general"
+key = "lgChannelAutoLaunch"
+value = '"off"'
+option = "lgchannels"
+since = "1.4"
+
+[[setting]]
+category = "network"
+key = "allowMobileDeviceAccess"
+value = 'false'
+option = "phone"
+since = "1.4"
+note = "Closes the phone remote API (verified on the C5: a paired remote app stops at once). Turning it back on does not restart LG's second-screen server within the same boot: the phone hook asks for a restart."
+
+# ------------------------------------------------------------ consent --
+# The consent list (eulaInfoNetwork) ids and the eulaStatus permission flags
+# the consents option declines (lib/eula.sh). The basic terms (S_SVC terms
+# of use, S_PRG privacy policy) and generalTermsAllowed, networkAllowed,
+# chpAllowed are never touched: declining them raises the agreements wall on
+# every launch.
+[eula]
+option = "consents"
+legacy = "consent"
+ids = ["S_VNG", "S_PRV", "S_TAD", "S_TAG", "S_ADG", "S_ADC", "S_ADD", "S_VDC", "S_VDD", "S_NVC", "S_NVD", "S_MKT", "S_DPA", "S_ALL"]
+flags = [
+  "acrAllowed", "acrOnAllowed", "acrAdAllowed", "acrGdprAllowed", "shoppingOnAllowed", "veranceOnAllowed",
+  "voiceAllowed", "voice2Allowed", "marketingOnAllowed", "customAdAllowed", "customadsAllowed",
+  "thirdPartySharingAllowed", "remoteDiagAllowed", "additionalDataAllowed", "additional1Allowed",
+  "additional2Allowed", "additional3Allowed", "additional4Allowed", "additional5Allowed", "cookiesAllowed",
+]

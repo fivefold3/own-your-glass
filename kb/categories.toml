@@ -1,0 +1,47 @@
+# Categories of the app's Customize screen, in display order.
+# Fields: id, title, blurb (one line under the heading).
+
+[[category]]
+id = "ads"
+title = "Ads and content recognition"
+blurb = "Ads and what watches the screen."
+
+[[category]]
+id = "usage"
+title = "Usage data and diagnostics"
+blurb = "Logs, crash reports and consents."
+
+[[category]]
+id = "voice"
+title = "Voice and microphones"
+blurb = "Assistants and microphones."
+
+[[category]]
+id = "screen"
+title = "Screen"
+blurb = "Screen captures."
+
+[[category]]
+id = "casting"
+title = "Casting and phones"
+blurb = "How other devices reach the TV."
+
+[[category]]
+id = "cloud"
+title = "LG cloud and smart home"
+blurb = "LG's cloud, smart home and AI."
+
+[[category]]
+id = "network"
+title = "Network"
+blurb = "Hostnames sent nowhere."
+
+[[category]]
+id = "access"
+title = "Remote access and prompts"
+blurb = "Remote access, accounts and prompts."
+
+[[category]]
+id = "advanced"
+title = "Advanced"
+blurb = "Experimental options."

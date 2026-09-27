@@ -1,0 +1,318 @@
+# LG's gateway (sdx) serviceNames: every name seen in a factory table
+# (webOS 6.5 to 11.2) or in the C5's server-pushed table. action:
+#   block  routed to oyg.invalid when its option is on
+#   keep   a function the TV needs; only a Lockdown option may block it
+#   never  sign-in, the clock or DRM: no option may block it
+# legacy = "sdx" marks the names 1.4's SDX_BLOCK carries (parity check).
+# callers and what come from the audit (reports/gateway-consent-remote.md §1)
+# and the webOS 11 deep dive (results/webos11-c5.md §3).
+
+# ------------------------------------------------------------- never --
+[[name]]
+name = "sdp_auth"
+action = "never"
+what = "Device authentication for every gateway call."
+
+[[name]]
+name = "sdp_init"
+action = "never"
+what = "Initialisation; the clock's 'sdp' time source; AirPlay provisioning and many others."
+
+[[name]]
+name = "sdp_common"
+action = "never"
+what = "Common configuration, including ACR config; the TV's first time source."
+
+[[name]]
+name = "device_keys"
+action = "never"
+what = "DRM and secure key provisioning (keyinstall, webOS 11)."
+
+# -------------------------------------------------------------- block --
+[[name]]
+name = "sdp_logging"
+action = "block"
+option = "diagnostics"
+legacy = "sdx"
+what = "The system log's usage records (the PmLog upload whitelist), eula withdrawals."
+
+[[name]]
+name = "rdx_secure"
+action = "block"
+option = "diagnostics"
+legacy = "sdx"
+what = "Crash and analytics report upload (uploadd)."
+
+[[name]]
+name = "rdxdev_secure"
+action = "block"
+option = "diagnostics"
+legacy = "sdx"
+what = "Developer log upload (PmLogDaemon)."
+
+[[name]]
+name = "ibis_stat_secure"
+action = "block"
+option = "usage-logs"
+legacy = "sdx"
+what = "The LiveTV per-channel-change log: channel, previous channel, zipcode, user ID. The most important non-ACR viewing log."
+
+[[name]]
+name = "nudge_log_secure"
+action = "block"
+option = "usage-logs"
+legacy = "sdx"
+what = "App and channel watch history (user-context-manager)."
+
+[[name]]
+name = "cdpbeacon_secure"
+action = "block"
+option = "usage-logs"
+legacy = "sdx"
+what = "LG Channels viewing beacons (dmost)."
+
+[[name]]
+name = "nudge_secure"
+action = "block"
+option = "promos"
+legacy = "sdx"
+what = "'AI Recommendation' nudges."
+
+[[name]]
+name = "homeprv_secure"
+action = "block"
+option = "promos"
+legacy = "sdx"
+what = "Home preview rows; the installed-app list."
+
+[[name]]
+name = "recommend_secure"
+action = "block"
+option = "promos"
+legacy = "sdx"
+what = "Recommendations."
+
+[[name]]
+name = "tlamp_secure"
+action = "block"
+option = "promos"
+legacy = "sdx"
+what = "Promotions."
+
+[[name]]
+name = "web_browser_rcmd"
+action = "block"
+option = "promos"
+legacy = "sdx"
+what = "Browser start-page recommendations."
+
+[[name]]
+name = "qcard"
+action = "block"
+option = "promos"
+legacy = "sdx"
+what = "Promo cards."
+
+[[name]]
+name = "sdp_onnow"
+action = "block"
+option = "promos"
+legacy = "sdx"
+what = "'On now' content; AI content details."
+
+[[name]]
+name = "cpv_secure"
+action = "block"
+option = "promos"
+legacy = "sdx"
+what = "Content-provider preview rows (webOS 10 and older)."
+
+[[name]]
+name = "upp"
+action = "block"
+option = "promos"
+since = "1.4"
+what = "Server-side audience segments LG has put this device in; nudges target them (webOS 11)."
+
+[[name]]
+name = "sdp_aiplatform_proactiveai"
+action = "block"
+option = "promos"
+since = "1.4"
+what = "Proactive-AI nudge policy (webOS 11)."
+
+[[name]]
+name = "wise30_device"
+action = "block"
+option = "promos"
+since = "1.4"
+what = "Targeted server notices (webOS 11)."
+
+[[name]]
+name = "sdp_aiplatform_aiconcierge"
+action = "block"
+option = "promos"
+since = "1.4"
+what = "AI Concierge: the foreground app, installed apps, current programme, IoT devices and 'user behavior context' (nlpmanager's knowme, webOS 11)."
+
+[[name]]
+name = "lg_gallery_plus"
+action = "block"
+option = "promos"
+since = "1.4"
+what = "Gallery+ artwork."
+
+[[name]]
+name = "sdp_nais"
+action = "block"
+option = "voice"
+legacy = "sdx"
+what = "AI Caption (NAIS) configuration."
+
+[[name]]
+name = "voice_proxy_secure"
+action = "block"
+option = "voice"
+legacy = "sdx"
+what = "Voice proxy."
+
+[[name]]
+name = "lgshop_secure"
+action = "block"
+option = "ads"
+legacy = "sdx"
+what = "LG shop and shoppable overlays."
+
+[[name]]
+name = "lgshoplog_secure"
+action = "block"
+option = "ads"
+legacy = "sdx"
+what = "LG shop 'viewing information' logs (acr2, livepick-plus)."
+
+[[name]]
+name = "cdp_service_secure"
+action = "block"
+option = "lgchannels"
+legacy = "sdx"
+what = "LG Channels service (dmost); lgchannelurl fetches the IP it puts in ad URLs through it."
+note = "1.4 blocks it with the gateway; the option engine moves it to the LG Channels option so Recommended keeps LG Channels."
+
+[[name]]
+name = "iot"
+action = "block"
+option = "thinq"
+legacy = "sdx"
+what = "ThinQ IoT."
+
+[[name]]
+name = "iot_push_secure"
+action = "block"
+option = "thinq"
+legacy = "sdx"
+what = "LG push."
+
+[[name]]
+name = "iot_sports_secure"
+action = "block"
+option = "buddy-sports"
+legacy = "sdx"
+what = "Sports alerts."
+
+[[name]]
+name = "buddy"
+action = "block"
+option = "buddy-sports"
+legacy = "sdx"
+what = "LG Buddy."
+
+[[name]]
+name = "sdp_ai_lab"
+action = "block"
+option = "ai"
+since = "1.4"
+what = "Life-on-Screen generative art prompts (lim)."
+
+[[name]]
+name = "sdp_aiplatform_iot"
+action = "block"
+option = "ai"
+since = "1.4"
+what = "The AI agent's smart-home control (webOS 11)."
+
+[[name]]
+name = "sdp_airplay"
+action = "block"
+option = "airplay"
+since = "1.4"
+what = "AirPlay key provisioning (mfi)."
+
+# ---------------------------------------------------------- lockdown --
+[[name]]
+name = "sdp_apps"
+action = "block"
+option = "store-traffic"
+since = "1.4"
+what = "Content Store installs and updates; the daily upload of every installed app and version (appUpdateService)."
+
+[[name]]
+name = "sdp_apps_resource"
+action = "block"
+option = "store-traffic"
+since = "1.4"
+what = "Downloads: the ad-log collector's script, service-logger's rules, remote support's package, IoT resources."
+
+[[name]]
+name = "cpauth_secure"
+action = "block"
+option = "store-traffic"
+since = "1.4"
+what = "Content-provider authorisation for the Store."
+
+[[name]]
+name = "wise_account"
+action = "block"
+option = "store-traffic"
+since = "1.4"
+what = "LG account."
+
+[[name]]
+name = "sdp_home"
+action = "block"
+option = "store-traffic"
+since = "1.4"
+what = "Home content, alarm nudges, editor's picks; eula notice texts."
+
+[[name]]
+name = "sdp_search"
+action = "block"
+option = "voice-core"
+since = "1.4"
+what = "Search, with search logging."
+
+[[name]]
+name = "sdp_nlp"
+action = "block"
+option = "voice-core"
+since = "1.4"
+what = "NLP, 'knowme' user intent."
+
+[[name]]
+name = "service_setting_secure"
+action = "block"
+option = "remote-config"
+since = "1.4"
+what = "Remote feature flags (configd's Remote layer), Settings' and support apps' configuration."
+
+[[name]]
+name = "ibis_secure"
+action = "block"
+option = "remote-config"
+since = "1.4"
+what = "Online programme guide and the address list Settings uses."
+
+# -------------------------------------------------------------- keep --
+[[name]]
+name = "wise_resource_secure"
+action = "keep"
+what = "Platform resources (webOS 10 and older); not classified further."

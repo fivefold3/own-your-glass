@@ -15,7 +15,7 @@ The `.ipk` layout is the standard webOS one:
 
 ```
 usr/palm/applications/org.ownyourglass.app/   appinfo.json, index.html, app.js, style.css, icons
-usr/palm/applications/org.ownyourglass.app/toolkit/   oyg, boot-hook, lib/, modules/, etc/
+usr/palm/applications/org.ownyourglass.app/toolkit/   oyg, boot-hook, lib/, hooks/, resources/, etc/
 usr/palm/packages/org.ownyourglass.app/packageinfo.json
 ```
 

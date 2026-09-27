@@ -16,11 +16,23 @@ jobs:
       - uses: actions/checkout@v4
       - name: shell syntax check
         run: |
-          for f in toolkit/oyg toolkit/boot-hook toolkit/lib/*.sh toolkit/modules/*.sh tools/*.sh; do sh -n "$f"; done
+          for f in toolkit/oyg toolkit/boot-hook toolkit/lib/*.sh toolkit/etc/*.sh toolkit/hooks/*.sh toolkit/resources/*.sh tools/*.sh tests/*.sh; do sh -n "$f"; done
+      - name: knowledge base (kb/*.toml)
+        env:
+          PYTHONDONTWRITEBYTECODE: "1"
+        run: |
+          python3 tools/kb.py check
+          python3 tools/kb.py drift
+          python3 tests/test_kb.py
+          python3 tools/kb.py docs && git diff --exit-code docs/COMPATIBILITY.md README.md
+      - name: tests (BusyBox sh and awk, as on the TV)
+        run: |
+          sudo apt-get install -y -q busybox-static >/dev/null
+          BUSYBOX=$(command -v busybox) tests/run.sh
       - name: shellcheck
         run: |
           sudo apt-get install -y -q shellcheck >/dev/null
-          shellcheck -s sh -S warning -e SC2034,SC2039,SC3043,SC2086,SC2046,SC1090,SC1091,SC2154 toolkit/oyg toolkit/lib/*.sh toolkit/modules/*.sh || true
+          shellcheck -s sh -S warning -e SC2034,SC2039,SC3043,SC2086,SC2046,SC1090,SC1091,SC2154 toolkit/oyg toolkit/lib/*.sh toolkit/hooks/*.sh toolkit/resources/*.sh || true
       - name: build
         run: tools/build-ipk.sh
       - uses: actions/upload-artifact@v4

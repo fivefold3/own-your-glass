@@ -2,124 +2,133 @@
 
 Privacy hardening for rooted LG webOS TVs, packaged as a Homebrew Channel app.
 
+> **Built with AI assistance.** Most of the code, tooling, tests and
+> research notes in this repository were written with Claude (Fable 5.1 and
+> Opus 5.5), directed and reviewed by the author. It is not a one-prompt
+> generation: every option was tested on a real TV, several rounds of
+> review found and fixed bugs in AI-written and hand-written code alike, and
+> the knowledge base was checked against 25 LG firmware images. Read the
+> code with the same care you would give any other project that touches
+> your TV as root; the tests and the [research notes](docs/RESEARCH.md) say
+> what was verified and how.
+
 It stops the parts of the TV that watch you: automatic content recognition
 (ACR), the advertising overlays and ad-ID manager, log and crash uploaders,
-LG remote support, the remote and far-field microphone pipelines and their
-wake-word triggers, the world-readable screen-capture file, LG's cloud and
+usage and viewing logs, LG remote support, the voice assistants and the
+built-in microphone, the world-readable screen-capture file, LG's cloud and
 smart-home daemons, and the logging and marketing traffic that goes out
-through LG's network gateway. It declines
-every tracking consent in every store the TV keeps, turns the ad and data
-settings off through LG's own settings service, and hides the ad, ACR and
-demo apps from the launcher. Everything is undone by pressing one button or
-by uninstalling the app.
+through LG's network gateway. It declines every tracking consent, turns the
+ad and data settings off through LG's own settings service, and hides the ad
+apps from the launcher. Everything is undone by pressing one button or by
+uninstalling the app. If the app is uninstalled, cleans up after itself
+leaving no trace after a reboot.
 
-Built and verified on a **2025 LG OLED (C5 series, webOS 10.3.1)**. The
-module specs discover what exists at run time, so other recent webOS models
-should work; anything that is not on your TV is skipped.
+Pick a protection level and press **Own the glass**:
 
-## How it works, in one paragraph
+- **Recommended**: blocks tracking and ads, and keeps AirPlay, Chromecast,
+  phone apps, LG Channels, HbbTV, the Content Store and LG sign-in working.
+- **Strict**: also turns off AirPlay, Google Cast, phone control, Screen
+  Share, LG Channels and LG's AI features, closes the TV to your network
+  (SSH included) and blocks your LG account.
+- **Lockdown**: also disables some LG system services. Settings gets slow
+  to open, and automatic time and time zone, search, Universal Control and
+  app installs stop working. Not recommended: the app asks before applying
+  it.
+- **Custom**: every option on or off, each with one line on what it does
+  and what it breaks; saved as your one custom selection.
+
+Built and verified on a **2025 LG OLED (C5 series, webOS 10.3.1)**.
+Knowledge about other TVs comes from 25 official LG firmware images
+(webOS 5.6 to 11.2; OLED, QNED and UHD; AU, EU, SG, North America and Korea):
+see [docs/COMPATIBILITY.md](docs/COMPATIBILITY.md). Anything that is not on
+your TV is skipped. On a webOS release it knows from firmware only (so
+far, every release but 10.3), LG's always-on services are left running by
+default, because a stopped one can make the TV's own screens wait; the app
+says so. Nothing they collect gets out (their upload routes are cut), but
+they keep collecting on the TV. Settings > **Untested protections** applies
+them anyway, and everything else not yet verified on a TV: you are then
+the first to try them. If a screen stops responding, Give the glass back
+or turn the switch off; if the TV does not start properly twice in a row,
+re-apply switches itself off and the TV comes up stock. On an unrecognised
+release, it applies only what it recognises, and says so.
+
+**Help verify your TV's release.** Turn Untested protections on, use the
+TV for a day (Settings, Date & Time, Home, the Content Store, your casting
+and phone apps), then Settings > **Generate a TV report** > **Copy to USB
+storage** and [open an issue](https://github.com/fivefold3/own-your-glass/issues/new)
+with the report attached (it holds no identifiers: model, software,
+which services exist, which were applied) and what worked or broke. A
+release verified that way is added to the knowledge base (`run_on` in
+`kb/services.toml`) and stops needing the switch.
+
+## How it works
 
 The app is an ordinary webOS web app. It runs a POSIX `sh` toolkit as root
 through Homebrew Channel's root service. For each unwanted daemon the toolkit
-stops its unit, bind-mounts `/dev/null` over its binary so nothing can start
-it again, and kills what is running. Persistent files (consent stores, the
-hidden-app list) are backed up once and rewritten. A boot hook in
+bind-mounts `/dev/null` over its binary so nothing can start it again, adds
+it to LG's own launch block list (which also covers the copies that run
+inside app jails), stops its unit and kills what is running. Consents and
+settings go through LG's settings service; LG's gateway is cut off from its
+logging endpoints by rewriting its routing table; hostnames go to nowhere
+through a generated `/etc/hosts`. Every change is recorded per option, so
+any option can be undone on its own. A boot hook in
 `/var/lib/webosbrew/init.d` re-applies all of it on every boot, guarded by a
 crash-loop breaker (see [Reboots](#reboots)). If it finds the app has been
 uninstalled, it restores every recorded change and removes itself. Full
-details in [docs/DESIGN.md](docs/DESIGN.md).
+details in [docs/DESIGN.md](docs/DESIGN.md); everything it knows about each
+service is in [kb/](kb/).
 
-## Modules
+## Presets and options
 
-| module | default | what it stops |
-|---|---|---|
-| `acr` | on | `acr2`, `adoverlay-service`, `admanager`, `livepick-plus`, plus `contentminer` (Home preview rows), which is not ACR |
-| `telemetry` | on | `uploadd`, `rdxd`, `rdx_reporter`, `remotelogger`, `nudge`, `service-logger`, `user-context-manager`, `ocpservice`, `sdp-server-notice`, `ftms` |
-| `remote` | on | `remotediag` (RemoteOne), the telnet root shell, the world-writable Homebrew Channel service tree |
-| `voice` | on | `voiceinput_hidraw`, `voiceinput_sound`, `voiceinput_preprocessor`, `voiceinput_network`, `voiceclick`, `trigger_alexa`, `trigger_thinq`, `airessrvallocator`, the Alexa and ThinQ AI adapters and the voice performer, including their jailed copies (the `voiceinput` hub and `voiceconductor` stay up: Settings calls both, and a call to a blocked `voiceconductor` never returns, which stopped the Date & Time page loading; neither has any input left) |
-| `mic` | on | the microphone capture endpoints (far-field "WoV" mic array); everything else that ALSA calls "capture" is internal audio routing (the sound-out path that feeds Bluetooth headphones, WiSA speakers and sound share, the recorder tap, mixer loops) and is left alone |
-| `capture` | on | `/tmp/capture.rgb` is emptied and becomes root-only (bind of a 0600 tmpfs file); `vtCaptureTestSuite` blocked |
-| `consent` | on | declines S_VNG/S_ADG/S_TAG/S_MKT/… in all four stores (the mandatory terms of use and privacy policy stay accepted, so no agreements wall); sets adCookie, aiNudge, thirdPartyCookie, watchedListCollection, usageCare, welcomeFeature and friends off |
-| `nag` | on | keeps `launchEulaByHome` off with a watcher that resets it within a second (that flag is what makes the Home app raise the "User Agreements" wall); clears pending "updated" flags. `eula-service` is left running: stopping it broke SDX's eula status, which `accountmanager` checks at boot, and that re-raised the LG account terms prompt |
-| `apps` | on | hides 41 ad/ACR/remote-support/demo app ids via `blockedSystemAppList/<REGION>.json` |
-| `cloud` | on | ThinQ IoT client and proxy, push client, rule engine, Home Hub, Matter, Family Care, MyCar, LG Buddy, Always Ready, sports alerts, AI inference, the Google Home hub, Chromecast provisioning, app casting, Avahi, the DIAL server, WOWCAST |
-| `sdx` | on | routes 23 of the 38 services behind LG's network gateway (logging, beacons, nudges, recommendations, shop, LG Channels) to nowhere, by rewriting its routing table; sign-in, the clock, the Content Store, AirPlay and Settings keep their LG hosts |
-| `network` | on | bind-mounts a generated `/etc/hosts` that sinkholes the fixed list of ad, ACR, telemetry and DoH hostnames, plus the gateway hosts only blocked `sdx` services use, with this TV's own country and region prefixes (IPv4 and IPv6) |
+<!-- options:begin -->
+| option | Recommended | Strict | Lockdown | breaks | notes |
+|---|:-:|:-:|:-:|---|---|
+| **Ads and content recognition** | | | | | |
+| Content recognition (ACR) | ● | ● | ● | Live Plus overlays |  |
+| Ad services | ● | ● | ● | Reset advertising ID, LG Shop |  |
+| Opt-out advertising ID | ● | ● | ● | – | Re-applied at every start; the ID file is covered read-only, so nothing can write a new one. The device IDs LG uses to recognise the TV are left alone. |
+| Home promotions and recommendations | ● | ● | ● | Home preview rows, promo cards, AI tips |  |
+| LG Channels |  | ● | ● | LG Channels | Turned off again, LG Channels needs a TV restart (the TV reads its hidden apps only at start-up); the app offers one. |
+| **Usage data and diagnostics** | | | | | |
+| Crash and log uploads | ● | ● | ● | – |  |
+| Viewing and usage logs | ● | ● | ● | Reset usage data, recent-apps order, monthly report |  |
+| Tracking consents | ● | ● | ● | – | The basic terms of use and privacy policy stay accepted. |
+| HbbTV tracking | ● | ● | ● | – |  |
+| HbbTV (not yet verified) |  | ○ | ○ | Freeview Plus, red button | Not yet tested on a TV with broadcast reception. |
+| **Voice and microphones** | | | | | |
+| Voice assistants and wake words | ● | ● | ● | Voice search, Alexa, ThinQ AI |  |
+| Built-in microphone | ● | ● | ● | Hands-free voice |  |
+| Voice framework and search |  |  | ● | Settings speed, automatic time, time zones, search | Verified on the C5: Settings opens slowly, Date & Time cannot be set automatically, the time-zone list and search results do not load. |
+| **Screen** | | | | | |
+| Screen-capture shield | ● | ● | ● | – | Also blocks a vendor video-plane grabber. |
+| **Casting and phones** | | | | | |
+| AirPlay |  | ● | ● | AirPlay, HomeKit (Siri) | The TV still shows in the AirPlay list, but connecting fails. |
+| Google Cast |  | ● | ● | Google Cast | The TV no longer shows up as a Cast device. |
+| Phone apps and second screen |  | ● | ● | Phone remote apps, launching apps from a phone, LG Link | Turned off again, phone remote apps need a TV restart (LG's phone server starts only with the TV); the app offers one. |
+| Screen Share |  | ● | ● | Screen Share | Also stops the TV's network announcements (avahi), which the Google Home hub uses to find devices. Turned off again, Screen Share needs a TV restart; the app offers one. |
+| Universal Control cloud lookups |  | ● | ● | – | Devices already set up keep working and new ones still set up (C5). |
+| LAN firewall |  | ● | ● | SSH, AirPlay, Google Cast, phone apps, Screen Share, network devices in Universal Control | Replies to connections the TV makes itself (streaming, browsing) still get through. IPv6 is off while it is on (the firewall cannot filter it). `oyg lan allow <ip>` lets a device through, for example your computer for SSH; otherwise turn the firewall off from the app on the TV. |
+| **LG cloud and smart home** | | | | | |
+| ThinQ and Home Hub | ● | ● | ● | ThinQ app, Home Hub, Matter, LG notifications |  |
+| Google Home hub | ● | ● | ● | Google Home hub |  |
+| LG Buddy and sports alerts | ● | ● | ● | LG Buddy, sports alerts |  |
+| AI features |  | ● | ● | Life-on-Screen art, AI agent | The TV's own AI Picture and AI Sound keep working (they run on the TV). |
+| Settings backup and presence | ● | ● | ● | Settings backup |  |
+| Universal Control and LAN device scanning |  |  | ● | Universal Control | The remote no longer controls boxes and soundbars (the volume pop-up shows a cross). |
+| **Network** | | | | | |
+| Tracker hostnames | ● | ● | ● | – | For everything on the TV, apps and browser included; also public DNS-over-HTTPS servers. |
+| LG Store and account traffic |  |  | ● | App installs and updates, Home content | Also stops Chromecast built-in from starting after a restart (Lockdown turns Cast off anyway). |
+| Remote configuration |  |  | ● | Online programme guide | Also stops Chromecast built-in from starting after a restart (Lockdown turns Cast off anyway). Nothing else was noticed on the C5. |
+| **Remote access and prompts** | | | | | |
+| Remote support and root hygiene | ● | ● | ● | LG remote support | Also keeps Homebrew Channel's telnet root shell off and fixes world-writable root files. |
+| Block LG account |  | ● | ● | Content Store installs, LG account features | The sign-in screen shows a network error. With no account, LG cannot tie the TV to one and the account terms prompt never appears. |
+| Terms prompts | ● | ● | ● | – | The LG account terms prompt comes with a signed-in account: Block LG account stops it. |
 
-Every module is on by default. Three of them cost features, and each says so
-under its name in the app:
+● on in that preset, ○ joins it once verified on a TV.
+<!-- options:end -->
 
-- `cloud` breaks the ThinQ phone app, the Home Hub, the Google Home hub, LG
-  Buddy, WOWCAST soundbar audio and launching apps from a phone (DIAL).
-  AirPlay is unaffected: it has its own mDNS service.
-- `sdx` empties the Home screen's recommendation and promo rows, the LG
-  Channels online guide, the LG shop and sports alerts. On the reference TV,
-  the Content Store (including installing an app), AirPlay, Settings and
-  automatic time were tested working with it on.
-- `network` stops anything that uses a sinkholed host. It is the
-  belt-and-braces layer behind the other modules, and it leaves LG's clock,
-  Content Store and sign-in hosts alone.
-
-### What each service does
-
-Everything a module stops, and the services it deliberately leaves alone, as
-found on a C5 (webOS 10.3.1) by reading its binary, its Luna
-registration and its logs. "Inferred" marks what comes from names and strings
-only. A service that is not on your TV is skipped.
-
-| module | service | what it does | sends data |
-|---|---|---|---|
-| `acr` | `acr2` | captures audio and video from broadcast and HDMI and runs a downloaded recognition library on it (an Alphonso data directory is on the TV) | yes, through that library (inferred) |
-| `acr` | `adoverlay-service` / `adoverlay` | draws shoppable and interactive ads over live TV and HDMI inputs | yes |
-| `acr` | `admanager` | advertising identifier, ad cookie, ad downloads and click tracking; runs all the time | yes (sdx, direct) |
-| `acr` | `livepick-plus` | turns ACR and guide data into notice-bar offers (food delivery, shopping) | downloads offers |
-| `acr` | `contentminer` | downloads the per-app preview rows on the Home screen from LG, optionally personalised | yes (sdx) |
-| – | `objectdetection`, `objectdetectionutilizer` | on-device text and sign-language detection for "sign language zoom". **Not blocked**: it sends nothing, and earlier versions only blocked it because it looked like part of ACR | no |
-| `telemetry` | `uploadd` | sends crash and analytics reports to LG | yes |
-| `telemetry` | `rdxd` | builds crash and analytics reports for `uploadd` | through `uploadd` |
-| `telemetry` | `rdx_reporter` | command-line tool that makes one report | no |
-| `telemetry` | `remotelogger` | crash backtrace helper | no network code |
-| `telemetry` | `nudge` | "AI Recommendation" tips picked from your app and channel usage | indirectly |
-| `telemetry` | `service-logger` | logs first use of each app, HDMI device brands, game inputs, volume and picture mode by rules LG can update | collects; upload path not traced |
-| `telemetry` | `user-context-manager` | records app and channel watch start and end times with your user number; ranks recent apps | yes (sdx `nudge_log_secure`) |
-| `telemetry` | `ocpservice` | OLED Care: panel hours, pixel-refresher runs, picture settings | yes (`ocp.lgtviot.com`) |
-| `telemetry` | `sdp-server-notice` | LG server notices and "alarm nudge" popups | downloads only |
-| `telemetry` | `ftms` | detects Bluetooth LE fitness machines (FTMS) | downloads the list of apps it may show over |
-| `remote` | `remotediag` | RemoteOne: LG support can push SSH keys, install dropbear, capture the screen, send keys, reboot and reset the TV | yes (`rone-*.lge.com`) |
-| `remote` | telnet | Homebrew Channel's root shell on port 23, with no password | – |
-| `remote` | Homebrew Channel service tree | the root service's files, shipped world-writable | – |
-| `voice` | `voiceinput_hidraw` | reads the Magic Remote microphone | no |
-| `voice` | `voiceinput_sound`, `voiceinput_preprocessor` | read and prepare the built-in far-field microphone | no |
-| `voice` | `voiceinput_network` | receives microphone audio from a paired phone | no |
-| – | `voiceconductor` | orchestrates voice requests (speech to text, intent, Alexa or ThinQ AI). **Not blocked**: Settings asks it for the supported languages at startup and waits for the answer, so blocking it broke the Date & Time page | no; the speech goes out through `nlpmanager` |
-| `voice` | `voiceclick` | finds clickable areas on screen for voice control | downloads its model |
-| `voice` | `trigger_alexa`, `trigger_thinq` | wake-word listeners | no |
-| `voice` | `amazon-alexa-adapter` | Alexa built-in (runs in a jail) | yes |
-| `voice` | `lg.thinqai.adapter` | ThinQ AI assistant and voice ID (runs in a jail) | yes |
-| `voice` | `airessrvallocator` | allocates the NPU for on-device AI models | no |
-| `voice` | `performer` | carries out voice commands (runs in a jail) | yes |
-| `mic` | "WoV PDM Mic" capture device | the built-in far-field microphone | – |
-| `capture` | `/tmp/capture.rgb` | a 640x360 grab of the UI every 3 s, written by the OLED panel service (for pixel care) and readable by every app | – |
-| `capture` | `vtCaptureTestSuite` | vendor command-line tool that dumps the video plane (nothing launches it) | no |
-| `cloud` | `iot-client` | ThinQ MQTT link (`connect-client.lgthinq.com`) | yes |
-| `cloud` | `iot-proxy` | ThinQ HTTPS proxy for the Home Hub | yes |
-| `cloud` | `pushclient` | LG push channel (AWS IoT MQTT) | yes |
-| `cloud` | `ruleengine` | ThinQ and Matter routines, synced with LG | yes |
-| `cloud` | `homeconnect`, `matter` | Home Hub device manager and Matter commissioner | yes |
-| `cloud` | `familycare` | local screen-time limit lock | no |
-| `cloud` | `mycar` | connected-car features | yes |
-| `cloud` | `buddyconnector` | LG Buddy: a linked family member can control the TV, get SOS alerts and video-call (KakaoTalk) | yes |
-| `cloud` | `alwaysready` | Always Ready: always-on display and motion wake | logs through `uploadd` |
-| `cloud` | `sportsalarm`, `sportsalert` | sports score alerts | yes |
-| `cloud` | `ai-inference-manager` | installs on-device AI models and sets up the NPU (AI Picture/Sound, inferred) | no |
-| `cloud` | `google-home-controller` | installs and runs the Google Home hub runtime | yes |
-| `cloud` | `chromecast-provisioning` | installs, starts and stops the cast receiver | – |
-| `cloud` | `appcasting` | turns a phone screen share into an app deeplink | yes (sdx) |
-| `cloud` | `avahi-daemon`, `avahi-adaptor` | DNS-SD for Google Home and Miracast over LAN. AirPlay (`mdnsd`) and Chromecast have their own | – |
-| `cloud` | `com.webos.service.dial` | DIAL server: phone apps launch YouTube or Netflix on the TV. `upnpd` still advertises it, so phones connect and time out | – |
-| `cloud` | `wowplay` | WOWCAST: wireless audio to LG soundbars | no |
-| `sdx` | logging and marketing endpoints | `sdp_logging`, `rdx_secure`, `rdxdev_secure`, `ibis_stat_secure`, `nudge_secure`, `nudge_log_secure`, `homeprv_secure`, `recommend_secure`, `tlamp_secure`, `web_browser_rcmd`, `qcard`, `sdp_nais`, `sdp_onnow`, `cdpbeacon_secure`, `cdp_service_secure`, `cpv_secure`, `lgshop_secure`, `lgshoplog_secure`, `iot`, `iot_push_secure`, `iot_sports_secure`, `voice_proxy_secure`, `buddy` | – |
-| `network` | `/etc/hosts` | sends ad, ACR, telemetry and DNS-over-HTTPS hostnames to nowhere | – |
+What each option stops, per service and per webOS release, is in
+[docs/COMPATIBILITY.md](docs/COMPATIBILITY.md).
 
 ## Install
 
@@ -133,39 +142,61 @@ Homebrew Channel > Settings > **Add repository**, and enter:
 https://raw.githubusercontent.com/fivefold3/webos-homebrew-repo/main/repo.json
 ```
 
-### Manual
+### Over SSH
+
+Turn on the SSH server in Homebrew Channel's settings, download the
+`.ipk` from the [latest release](https://github.com/fivefold3/own-your-glass/releases/latest)
+(or build it yourself with `tools/build-ipk.sh`, which writes
+`dist/org.ownyourglass.app_<version>_all.ipk`; no LG SDK needed), then hand
+it to the TV's own installer:
 
 ```sh
-tools/build-ipk.sh                       # -> dist/org.ownyourglass.app_<version>_all.ipk
-tools/deploy.sh root@<tv-ip> --launch    # scp + the stock installer, no LG SDK needed
+scp org.ownyourglass.app_<version>_all.ipk root@<tv-ip>:/tmp/oyg.ipk
+ssh root@<tv-ip> "luna-send -i -f luna://com.webos.appInstallService/dev/install \
+  '{\"id\":\"com.ares.defaultName\",\"ipkUrl\":\"/tmp/oyg.ipk\",\"subscribe\":true}' </dev/null"
 ```
 
+The installer reports its progress; once it prints `"state": "installed"`
+press Ctrl-C and remove `/tmp/oyg.ipk`. (`luna-send` needs its stdin
+closed, hence the `</dev/null`, or it prints nothing.)
+
+`tools/deploy.sh root@<tv-ip> --launch` does the same in one go: it builds
+the ipk, copies it over, waits for "installed", deletes the copy and opens
+the app (`--no-build` uses the newest ipk already in `dist/`).
+
 Installing changes nothing; open the app and press **Own the glass**. The
-main screen shows one thing: whether the glass is owned by you or by LG.
-Settings holds a toggle per protection (OK flips it, Apply commits), the log,
-undo and uninstall. Options that cost you a feature say so under their name;
-turn them off there if you need that feature.
+main screen shows whether the glass is owned by you or by LG, plus a notice
+when something needs you ("Restart required", "LG Account signed in", "Not
+re-applied at start-up").
+Settings (top right) holds the protection level, **Customize** (every option,
+with what it breaks), the actions, undo and uninstall.
 
 ## Clearing what was already collected
 
 Stopping the collectors does not delete what they had gathered. Settings >
 **Clear collected data** (`oyg purge`) removes it:
 
-- the voice transcript logs (`/tmp/app.voice.log`, `/tmp/var/log/messages`);
+- the voice transcript logs (`/tmp/app.voice.log`, `/tmp/var/log/messages`)
+  and the request dumps the voice, AI and ad stacks leave in `/tmp`;
 - the ad manager's cached ad assets, home-promotion state, cookie and
-  "fck" state, and the ad log service's encrypted log and backups;
+  "fck" state, and everything the ad log service collected;
 - everything queued for upload to LG: the log uploader spool, the remote
   diagnostics spool and the fault manager's crash bundles;
-- tracker cookies in the web-app profile whose host matches the blocklist
-  (deleted row by row; the store itself is left alone so web apps stay
-  signed in, unless you run `oyg purge --web-cookies`);
+- the Home Hub's cached LG account token (webOS 10) and LG Channels' ad-URL
+  cache;
+- tracker cookies in the web-app profile: rows whose host is a sinkholed
+  name, and analytics cookies (`_ga`, `_gid`, …) whatever site set them
+  (the store itself is left alone so web apps stay signed in, unless you run
+  `oyg purge --web-cookies`);
 - and it **resets the advertising identifier** (`/var/lib/secretagent/IFA.txt`)
-  to a new random UUID, keeping a copy of the old one in the backup
-  directory. The device id next to it (`nduid`) is not touched: LG account
-  and store features depend on it.
+  to a new random UUID (the old one is not kept anywhere), unless the
+  Opt-out advertising ID option already holds it at zeros. The device id
+  next to it (`nduid`) is not touched: LG account and store features
+  depend on it.
 
-This is a one-off action, not a module: nothing about it is re-applied at
-boot or undone on uninstall.
+`oyg purge --forget` also deletes the Matter/Homey pairing keys. This is a
+one-off action: nothing about it is re-applied at boot or undone on
+uninstall.
 
 ## Two different "terms" prompts
 
@@ -174,36 +205,69 @@ webOS has two unrelated agreement flows:
 - **TV agreements** ("User Agreements": viewing information, interest-based
   ads, voice, marketing). `eula-service` fetches new versions and sets the
   `launchEulaByHome` setting; the Home app then raises the wall. The
-  `consent` module declines the optional ones and keeps the mandatory Terms
-  of Use and Privacy Policy accepted (declining those is what forces the wall
-  on every launch); the `nag` module's watcher resets `launchEulaByHome` the
-  moment anything sets it.
+  "Tracking consents" option declines the optional ones and keeps the
+  mandatory Terms of Use and Privacy Policy accepted (declining those is what
+  forces the wall on every launch); the "Terms prompts" option's watcher
+  resets `launchEulaByHome` the moment anything sets it.
 - **LG account terms** (LG Account Terms of Use and Privacy Policy, Smart
-  Media Product Membership Privacy Policy). After the account auto-login at
-  boot, `accountmanager` compares the account's agreed term ids with LG's
-  latest and launches `com.webos.app.membership` when they differ. Nothing
-  local satisfies that check without agreeing, so the `nag` watcher closes
-  that app whenever `accountmanager` launched it (opening LG Account from
-  Settings is a different caller and is left alone). LG's own rule is
-  "agree or be signed out"; in practice the account kept working on the
-  reference TV. Toggle `nag` off if you would rather see the prompt.
+  Media Product Membership Privacy Policy). A signed-in LG account signs
+  itself in again at every restart, and `accountmanager` then checks the
+  account's terms with LG's servers and opens `com.webos.app.membership`
+  (it asked again at every restart on the reference TV). There is no local
+  switch for "keep the account but don't sign in automatically", and Own
+  Your Glass does not close LG's screen behind your back. Instead the main
+  screen says **LG Account signed in**, and Settings offers **Sign out**
+  (the account stays on the TV) or **Remove account** (the TV forgets it):
+  either stops the prompt and stops LG tying what the TV does to your
+  account. The Content Store then asks you to sign in before it installs an
+  app. The "Block LG account" option removes any account and sinkholes LG's
+  sign-in page and account server, so none can sign in again (the sign-in
+  screen shows a network error; turn the option off to sign in).
 
 ## Reboots
 
 Protections are re-applied on every boot (binds and stopped services do not
 survive a reboot on their own). A crash-loop breaker guards this: the boot
-hook writes a marker before applying and clears it only after the TV has been
-up for five minutes or the app has read the status; if the marker is still
-there at the next boot, the previous boot never got that far, so persistence
-switches itself off and nothing is applied. `oyg persist off` turns boot
-re-apply off by hand (then a reboot brings the stock TV back and you press
-Own the glass again). Homebrew Channel's own failsafe mode sits underneath
-all of that.
+hook writes a marker before applying and clears it once the TV's UI has been
+up for two minutes or the app has read the status. A boot that never gets
+that far is not confirmed; one is ordinary (the TV switched off again within
+minutes), and two in a row switch re-apply off (a toast says so when
+Notifications are on). The main screen then shows **Not re-applied at
+start-up** and Settings > **Re-apply at start-up** turns it back on
+(`oyg persist on`). `oyg persist off` turns it off by hand (then a restart
+brings the stock TV back and you press Own the glass again). Homebrew
+Channel's own failsafe mode sits underneath all of that.
+
+### Notifications
+
+Own Your Glass works silently by default. Settings > **Notifications**
+(`oyg toasts on|off`) turns on the short messages it puts on the TV screen:
+protections re-applied at start-up, collected data cleared, the TV restored
+after an uninstall.
+
+### Restarts the TV needs
+
+A few changes only finish after a restart, and the app says so (**Restart
+required**, with Restart now or Later):
+
+- turning **Phone apps** off again: LG's phone server starts only with the TV;
+- turning **Screen Share** off again: Miracast connects again only after a
+  restart;
+- showing an app again that an option had hidden (LG Channels): the TV reads
+  its hidden-app list only when it starts;
+- JS services that were already loaded when an option blocked them (DIAL,
+  for one) keep running until the next restart.
 
 ## Undo
 
 - **Give the glass back** (Settings) restores every change and keeps the app.
+  Nothing is re-applied at start-up until you press Own the glass again.
 - **Restore and uninstall** restores, then removes the app.
+- Undo is faithful, so it also puts back what "Remote support and root
+  hygiene" had closed: Homebrew Channel's telnet root shell (port 23, no
+  password) is allowed again if Homebrew Channel has it on, and its files
+  go back to world-writable. The log and a toast say so (this toast is
+  shown even with Notifications off).
 - Uninstalling from Homebrew Channel also works: on the next boot the hook
   restores the TV and deletes itself.
 
@@ -213,14 +277,25 @@ The toolkit also runs from an SSH shell. Everything the app does is
 `oyg <command>`:
 
 ```sh
-oyg status              # fast, safe to poll
-oyg apply [module...]   # apply enabled modules (or the named ones)
-oyg restore [module...] # undo
-oyg enable|disable mod  # toggle and apply/undo one module
-oyg persist on|off      # re-apply on boot (default on, crash-loop breaker armed)
-oyg purge               # delete collected ad, diagnostic and voice data; reset the advertising ID
-oyg uninstall           # restore, remove hook and state
-OYG_DRYRUN=1 oyg apply  # print what would change, change nothing
+oyg status                  # fast, safe to poll
+oyg options                 # every option, and whether it is on
+oyg preset strict           # choose recommended, strict or custom, and apply it
+oyg set hbbtv=on voice=off  # change your Custom selection and apply it
+oyg apply                   # apply the current selection again
+oyg restore [option...]     # undo (everything, or the named options)
+oyg persist on|off          # re-apply on boot (default on, crash-loop breaker armed)
+oyg toasts on|off           # messages on the TV screen (default off)
+oyg try lan                 # apply an option for a test only: Re-apply or a restart undoes it
+oyg lan allow 192.168.1.50  # let one device through the LAN firewall (oyg lan list, oyg lan deny)
+oyg untested on|off         # also apply what is not yet verified on a TV (Settings > Untested protections)
+oyg purge                   # delete collected ad, diagnostic and voice data; reset the advertising ID
+oyg survey                  # a report on this TV and which services it has (no IDs)
+oyg survey usb              # the last report, as it is, saved to USB storage as a .txt
+oyg account status          # is an LG account signed in (yes or no, never the id)
+oyg account signout|remove  # sign out of it, or remove it from the TV
+oyg reboot                  # restart the TV (some undos wait for one)
+oyg uninstall               # restore, remove hook and state
+OYG_DRYRUN=1 oyg apply      # print what would change, change nothing
 ```
 
 To try it without installing anything:
@@ -229,6 +304,34 @@ To try it without installing anything:
 tools/bundle.sh | ssh root@<tv-ip> 'OYG_DRYRUN=1 OYG_ROOT=/nonexistent sh -s -- apply'
 ```
 
+## Servers LG picks at runtime
+
+Some of what the TV talks to is not in its firmware: LG's gateway hands the
+addresses out at runtime, and they differ by region. Own Your Glass can only
+block names it has seen, so a TV in another region may reach servers that
+are not in `kb/hosts.toml` yet. Names that carry LG's region code are
+sinkholed for every region LG uses (`aic`, `eic`, `kic`, `cic`, `ruc`);
+names that carry the country code use your TV's country once LG's gateway
+has reported it, and until then every country LG serves (the app shows a
+notice and a toast, and the next apply narrows it down). On the reference
+TV (Australia, LG's "KIC" region) a router's DNS log showed:
+
+- `www.ueiwsp.com`: UEI's QuickSet cloud, which Universal Control uploads
+  the signatures of your devices to. Blocked by "Universal Control cloud
+  lookups" (devices keep working, and new ones still set up).
+- an AWS IoT (MQTT) endpoint in LG's Seoul region, looked up every few
+  minutes together with LG's gateway, also with no app open. Which program
+  asks is not proven yet, so it is noted here rather than blocked, and the
+  exact name is left out: it may be specific to one region or set-up.
+- For about the first 50 seconds after power-on, before the boot hook has
+  applied anything, the TV already looks these up.
+
+To see your own TV's lookups, turn on your router's DNS query log and filter
+it by the TV's address (on OpenWrt: `uci set dhcp.@dnsmasq[0].logqueries='1';
+uci commit dhcp; /etc/init.d/dnsmasq restart`, then
+`logread -f | grep 'from <tv-ip>'`; set it back to `0` afterwards). Names
+that are new, especially regional ones, are worth reporting.
+
 ## Safety notes
 
 - Never flash the kernel, rootfs or TVService. This toolkit never writes to a
@@ -236,23 +339,35 @@ tools/bundle.sh | ssh root@<tv-ip> 'OYG_DRYRUN=1 OYG_ROOT=/nonexistent sh -s -- 
   `/var`, `/mnt/lg` and `/media`.
 - `sdx`, `tvdataexchanger`, `eplmanager`, `captureservice`, `iconnectivity`
   (Universal Control), ConnMan, the interpreters and `/dev/hidraw*` are on a
-  hard never-touch list. Binding `sdx` silently kills the Settings UI (the
-  `sdx` module edits its routing table and restarts it instead); touching
-  ConnMan has taken a TV off the network for half an hour.
-- A service that is blocked while something still calls it can hang the
-  caller: a call to a blocked `voiceconductor` never returned, and Settings
-  waited on it. That is why `voiceconductor` and the `voiceinput` hub are left
-  running; after any change to a spec, the main screens are checked again.
+  hard never-touch list (`kb/services.toml`, checked in CI). Binding `sdx`
+  silently kills the Settings UI (its routing table is rewritten instead);
+  touching ConnMan has taken a TV off the network for half an hour.
+- A call to a stopped **static** service waits for it (a blocked
+  `voiceconductor` never answered, and Settings waited on it); a call to a
+  blocked on-demand service fails at once. That is why `voiceconductor` and
+  the `voiceinput` hub are left running, and why every change is checked on
+  a TV against Settings, Date & Time and Home before it joins a preset.
 - Firmware updates are not blocked here. Homebrew Channel has that toggle.
 - Not a defence against an attacker who already has root.
+- Opening the app for the first time is itself noted by LG's usage logger
+  (an `NL_FIRSTUSE` line with the app's id) before anything is applied, and
+  under the TV's existing consents that one line can go out.
 
 ## Repository layout
 
 ```
 app/        webOS app (appinfo.json, index.html, app.js, style.css, icons)
-toolkit/    oyg, boot-hook, lib/, modules/, etc/blocklist.txt  (bundled into the ipk)
-tools/      build-ipk.sh, deploy.sh, bundle.sh
-docs/       DESIGN.md, HOMEBREW.md
+toolkit/    oyg, boot-hook, lib/ (engine), hooks/ and resources/,
+            etc/ (generated from kb/)            (bundled into the ipk)
+kb/         the service knowledge base: every option, service, gateway name,
+            hostname, setting and app OYG handles, with what it does, what
+            breaks, and on which webOS releases it exists (tools/kb.py)
+tools/      build-ipk.sh, deploy.sh, bundle.sh, kb.py,
+            spec-check.py (resolves the knowledge base against extracted LG firmware)
+tests/      run.sh (the toolkit under BusyBox sh), test_kb.py (the knowledge
+            base's safety rules)
+docs/       DESIGN.md, HOMEBREW.md, RESEARCH.md (what was learned about the
+            TVs, and how), COMPATIBILITY.md (generated from kb/)
 ```
 
 ## Credits
@@ -263,23 +378,27 @@ This project exists because of other people's work:
   ([216,000,000 Spy TVs | The LG Smart TV Problem](https://www.youtube.com/watch?v=6IFVTcM28KA),
   with Level1Techs and independent researchers) is the source of the threat
   model here: ACR, standby audio capture, plaintext voice transcripts, network
-  discovery and the upload paths. Every module maps back to something that
+  discovery and the upload paths. Every option maps back to something that
   investigation showed.
 - **Julio Ferrero's [own-your-glass](https://github.com/JulioFerrero/own-your-glass)**
   (MIT) — the original toolkit of the same name and its verification report
-  on a 2025 LG B5, which confirmed the Gamers Nexus findings on real hardware
-  and worked out the mechanisms this project reuses: `/dev/null` bind mounts
-  over binaries and device nodes, the `/etc/hosts` overlay, the consent
-  stores, the hidden-apps list, the `luna-send` stdin trap and the
-  never-touch list (`sdx`, the overlay containers, ConnMan). This is a
-  re-implementation of that work as a Homebrew Channel app, re-verified on a
-  C5.
+  on a 2025 LG B5, the first of this work done on real hardware, were the
+  starting point. This project keeps the name and several mechanisms that
+  report established: `/dev/null` bind mounts over binaries, the
+  `/etc/hosts` overlay, the hidden-apps list, the `luna-send` stdin trap,
+  and never touching `sdx` or ConnMan. Since then the implementation has
+  diverged: this is a Homebrew Channel app with an option engine, presets
+  and per-option undo; its service list comes from a survey of 25 firmware
+  images with each entry re-verified on a C5; consents go through LG's
+  settings service; and LG's gateway is handled by rewriting its routing
+  table. Where the two differ, it is the result of that later work, and
+  none of it would have started without the original.
 - **[webosbrew](https://github.com/webosbrew)** — Homebrew Channel, its root
   service (`org.webosbrew.hbchannel.service/exec`), the boot hooks in
   `/var/lib/webosbrew/init.d` and the rooting guides. Nothing here would run
   without it.
 - **[lg-tv-blocklist](https://github.com/furkan-bayrak/lg-tv-blocklist)**
   by furkan-bayrak (CC BY 4.0) — part of the hostname list in
-  `toolkit/etc/blocklist.txt`.
+  `kb/hosts.toml`.
 
 MIT licence.

@@ -1,0 +1,208 @@
+# Hostnames sent nowhere through /etc/hosts, by option. /etc/hosts has no
+# wildcards, so names are exact, with two templates:
+#   {ric}.  the regional prefixes LG uses: aic. eic. kic. (and the bare name)
+#   {cc}.   this TV's country, lower case (au., de., …)
+# legacy = "network" marks the names in 1.4's etc/blocklist.txt (parity).
+# The gateway's own hosts are not listed: the network module adds the ones
+# only blocked gateway names use, from the TV's routing table.
+
+# ---------------------------------------------------------------- ads --
+[[host]]
+names = ["ads.lgtvcommon.com", "aic.ads.lgtvcommon.com", "ad.lgappstv.com", "lgsmartad.com", "info.lgsmartad.com", "de.info.lgsmartad.com", "smart.adtvc.app", "adsdtvc.com", "initscr.lge.com"]
+option = "ads"
+legacy = "network"
+
+[[host]]
+names = ["{cc}.membership.lgwebostv.com", "{cc}.emp.lgsmartplatform.com", "{cc}.lgeapi.com"]
+option = "account"
+since = "1.4"
+note = "The LG account sign-in page (loaded by com.webos.app.membership), the account backend accountmanager signs in, refreshes tokens and checks terms against (EMP), and LG's API gateway the page called next. Seen in the router DNS log when the sign-in screen opened (C5, au.); au.lgeapi.com appeared at no other time. Blocked, the sign-in screen shows its network-error page."
+
+[[host]]
+names = ["de.emp.lgsmartplatform.com"]
+option = "ads"
+legacy = "network"
+retire = true
+note = "emp.lgsmartplatform.com is the LG account backend (accountmanager's empbackend); sinkholing the German one may break sign-in there. Dropped by the option engine unless shown to be ad-only."
+
+[[host]]
+names = ["{ric}.api.adts.lgtvcommon.com", "{ric}.videoads.lgtvcommon.com", "{ric}.fooddelivery.lgtvcommon.com", "{ric}.lgshopsvc.lgappstv.com"]
+option = "ads"
+since = "1.4"
+note = "api.adts: the ad-log collector (lsa); videoads, fooddelivery: overlay ads; lgshopsvc: LG shop."
+
+# ---------------------------------------------------------------- acr --
+[[host]]
+names = ["alphonso.tv", "cdn-aas-campaigns.alphonso.tv", "konograma.com", "marker.konograma.com", "marker2.konograma.com"]
+option = "acr"
+legacy = "network"
+
+[[host]]
+names = ["prov-lg.alphonso.tv", "eulacheck.alphonso.tv", "config-overlay-ads.alphonso.tv", "{ric}.videoacr.lgtvcommon.com", "moments-edge-service.edgevideo.ai", "moments-edge-service-342233178764.us-central1.run.app"]
+option = "acr"
+since = "1.4"
+note = "The Alphonso SDK learns more names at runtime; block *.alphonso.tv at the router. EdgeVideo: webOS 11 livepick-plus frame uploads."
+
+# ------------------------------------------------------------- promos --
+[[host]]
+names = ["homeprv.lgtvcommon.com", "recommend.lgtvcommon.com", "nudge.lgtvcommon.com", "eic.nudge.lgtvcommon.com", "eic.wiseconfig.lgtvcommon.com", "pnv.lgtvcommon.com", "qcardservice.lgtvcommon.com", "lggalleryplus.com", "cf-kic.lggalleryplus.com"]
+option = "promos"
+legacy = "network"
+
+[[host]]
+names = ["{ric}.lggalleryplus.com", "{ric}.lgrecommends.lgappstv.com"]
+option = "promos"
+since = "1.4"
+
+# --------------------------------------------------------- usage-logs --
+[[host]]
+names = ["cdpbeacon.lgtvcommon.com"]
+option = "usage-logs"
+legacy = "network"
+
+[[host]]
+names = ["{ric}.cdpbeacon.lgtvcommon.com", "{ric}.cdpbeacon2.lgtvcommon.com", "{ric}.ocp.lgtviot.com"]
+option = "usage-logs"
+since = "1.4"
+note = "cdpbeacon: LG Channels viewing beacons; ocp: the OLED care journal, sent directly."
+
+[[host]]
+names = ["{cc}.elastic.lgwebostv.com", "aj7.elastic.lgwebostv.com"]
+option = "usage-logs"
+since = "1.4"
+needs_test = true
+note = "API logging with the MAC and account number from the Content Store and LG Account; check the Store still works."
+
+[[host]]
+names = ["{ric}.homegym.lgappstv.com"]
+option = "usage-logs"
+since = "1.4"
+note = "webOS 11 ftms workout upload (KR/US)."
+
+# -------------------------------------------------------- diagnostics --
+[[host]]
+names = ["rdl.lgtvcommon.com", "{cc}.rdl.lgtvcommon.com", "qt2-kic.service.lgtvcommon.com"]
+option = "diagnostics"
+since = "1.4"
+note = "rdl: developer logs from uploadd, sent directly; qt2-kic.service: upnpd debug upload."
+
+# -------------------------------------------------------------- voice --
+[[host]]
+names = ["avsxappcaptiveportal.com"]
+option = "voice"
+legacy = "network"
+
+[[host]]
+names = ["wau.lgtvcommon.com", "he-kr-ai.lgthinq.com"]
+option = "voice"
+since = "1.4"
+note = "wau: webOS 10 performer's actor recognition; he-kr-ai: ThinQ AI speech."
+
+# ------------------------------------------------------------- cloud --
+[[host]]
+names = ["eic.lgtviot.com"]
+option = "thinq"
+legacy = "network"
+
+[[host]]
+names = ["connect-client.lgthinq.com", "common.lgthinq.com", "kic-st-iotservice.lgthinq.com", "{ric}.lgtviot.com", "push.lgtviot.com"]
+option = "thinq"
+since = "1.4"
+note = "kr.lgeapi.com (the ThinQ proxy's host) is not listed: on a Korean TV it is {cc}.lgeapi.com, LG's account API, which only Block LG account (Strict) may sinkhole. The proxy binary is blocked instead."
+
+[[host]]
+names = ["{ric}.buddy.lgtviot.com"]
+option = "buddy-sports"
+since = "1.4"
+
+[[host]]
+names = ["eic.lab.lgtvcommon.com"]
+option = "ai"
+legacy = "network"
+note = "1.4 sinkholes it in the default set; the option engine moves it to AI features."
+
+[[host]]
+names = ["{ric}.lab.lgtvcommon.com"]
+option = "ai"
+since = "1.4"
+note = "Life-on-Screen generative art (lim)."
+
+[[host]]
+names = ["www.ueiwsp.com", "ueiwsp.com"]
+option = "uei-cloud"
+since = "1.4"
+note = "UEI Web Services Platform, QuickSet's cloud: iconnectivity's only internet connection (C5, router DNS log while setting up a device). The earlier guesses ({ric}.uei.lgtviot.com does not resolve; quicksetcloud.com is UEI's website) were wrong."
+
+[[host]]
+names = ["discovery.meethue.com"]
+option = "uei-cloud"
+since = "1.4"
+note = "Philips Hue cloud discovery (it tells Philips your public IP); looked up in the same second as ueiwsp.com while Universal Control set up a device, caller not confirmed. Hue bridges are still found on the local network."
+
+[[host]]
+names = ["{ric}.cdpsvc.lgtvcommon.com", "{ric}.cdplauncher.lgtvcommon.com", "{ric}.lgchhomeapp.lgtvcommon.com"]
+option = "lgchannels"
+since = "1.4"
+
+# ----------------------------------------------------------- trackers --
+[[host]]
+names = [
+  "demdex.net", "dpm.demdex.net", "everesttech.net", "criteo.com", "doubleclick.net",
+  "sxp.smartclip.net", "hbbtv.smartclip.net", "es.container.enhanced.live", "bitv.eu",
+  "ottera.tv", "stream.ads.ottera.tv", "otteravision.com", "lge-oo-es.otteravision.com",
+  "adstk.io", "eu-ssp-pix.adstk.io", "eu-imp-pix.adstk.io", "smartadserver.com",
+  "prg.smartadserver.com", "axiom.co", "api.axiom.co", "ipify.org", "api.ipify.org",
+  "onetrust.io", "mobile-data.onetrust.io", "googletagmanager.com", "www.googletagmanager.com",
+]
+option = "trackers"
+legacy = "network"
+note = "Ad-tech seen on the wire from a TV with every consent declined (EU)."
+
+[[host]]
+names = [
+  "dns.google", "dns.google.com", "cloudflare-dns.com", "mozilla.cloudflare-dns.com",
+  "chrome.cloudflare-dns.com", "one.one.one.one", "dns.quad9.net", "dns9.quad9.net",
+  "doh.opendns.com", "dns.adguard.com", "dns.adguard-dns.com", "doh.cleanbrowsing.org", "dns.nextdns.io",
+]
+option = "trackers"
+legacy = "network"
+note = "Public DNS-over-HTTPS endpoints: keep apps from sidestepping the sinkhole."
+
+[[host]]
+names = ["www.google-analytics.com", "region1.google-analytics.com", "analytics.google.com"]
+option = "trackers"
+since = "1.4"
+note = "GA4 through Google Tag Manager in LG Account pages."
+
+# -------------------------------------------------------------- never --
+# Never sinkholed, whatever an option says.
+# The codes LG puts in front of its hosts, for {ric}. and {cc}. names when the
+# TV's own codes are not known yet (resources/network.sh falls back to all of
+# them and says so). Regions: the five LG's own service tables name
+# (billing, homeconnect defaultServerOption.js). Countries: the union of
+# etc/palm/countryList.json on webOS 10.3 and 11.2 (placeholders __ and
+# xa-xe left out); the TV's own list is read first where it exists.
+[codes]
+regions = ["aic", "eic", "kic", "cic", "ruc"]
+countries = [
+  "ae", "al", "ar", "at", "au", "ba", "be", "bg", "bh", "br", "by", "ca", "ch", "cl", "cm", "cn",
+  "co", "cz", "de", "dk", "dz", "ec", "ee", "es", "fi", "fr", "gb", "gh", "gr", "hk", "hn", "hr",
+  "hu", "id", "ie", "il", "in", "iq", "ir", "is", "it", "jo", "jp", "ke", "kh", "kr", "kw", "kz",
+  "lb", "lk", "lt", "lu", "lv", "ly", "ma", "mk", "mm", "mn", "mu", "mw", "mx", "my", "na", "ng",
+  "nl", "no", "nz", "om", "pa", "pe", "ph", "pk", "pl", "pt", "qa", "ro", "rs", "ru", "sa", "se",
+  "sg", "si", "sk", "th", "tn", "tr", "tw", "ua", "ug", "us", "uz", "ve", "vn", "ye", "za", "zm",
+  "zw",
+]
+
+[never]
+names = ["lgtvonline.lge.com", "connectivitycheck.gstatic.com", "ngfts.lge.com", "tv.wiselg.com", "tv.wiselg.cn", "nextlgsdp.com", "lgtvsdp.com", "app.lgwebostv.com", "snu.lge.com", "su.lge.com"]
+suffixes = ["-ngfts.lge.com", ".ngfts.lge.com"]
+prefixed = ["tv.wiselg.com", "tv.wiselg.cn", "nextlgsdp.com", "lgtvsdp.com", "app.lgwebostv.com"]
+reasons = [
+  "lgtvonline.lge.com: ConnMan's online check; without it the TV thinks it is offline",
+  "ngfts: the terms-and-conditions UI loads from it and shows 'system error' when it is sinkholed",
+  "<CC>/<RIC>.tv.wiselg.com: webOS 11 carries sign-in, the clock and the Store on it; only the gateway table can separate telemetry",
+  "<CC>.nextlgsdp.com / lgtvsdp.com: LG's clock rides on them; sinkholing broke TLS once (clock fell back to 2021)",
+  "<CC>.app.lgwebostv.com: the Content Store",
+  "snu/su.lge.com: firmware updates are Homebrew Channel's toggle, the owner's call",
+]

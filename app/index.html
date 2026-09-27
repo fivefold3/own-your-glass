@@ -11,7 +11,9 @@
 
   <!-- ===== main: status + one action ===== -->
   <section class="screen main" id="screen-main">
-    <header class="bar"><span class="brand">Own Your Glass</span><span class="device" id="device"></span></header>
+    <header class="bar"><span class="brand">Own Your Glass</span>
+      <button class="pill corner" id="settings-btn"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z"/></svg>Settings</button>
+    </header>
     <div class="hero">
       <div class="glass" id="glass">
         <svg viewBox="0 0 130 130" class="eye-svg" aria-hidden="true">
@@ -35,15 +37,23 @@
       <div class="status">
         <div class="owner" id="owner">Checking&hellip;</div>
         <div class="detail" id="detail"></div>
+        <div class="notice" id="notice" hidden></div>
       </div>
       <div class="actions" id="main-actions">
-        <button class="pill primary" data-act="own">Own the glass</button>
-        <button class="pill" data-act="settings">Settings</button>
+        <button class="pill primary" id="own-btn">Own the glass</button>
+        <button class="pill" id="restart-btn" hidden>Restart now</button>
       </div>
     </div>
+    <footer class="foot" id="device"></footer>
   </section>
 
-  <!-- ===== settings ===== -->
+  <!-- ===== customize: options by category ===== -->
+  <section class="screen panel" id="screen-customize" hidden>
+    <header class="bar"><span class="back" aria-hidden="true">&#8249;</span><span class="title">Customize</span><span class="hint" id="customize-hint"></span></header>
+    <div class="list" id="customize-list"></div>
+  </section>
+
+  <!-- ===== settings: protection level, customize, actions ===== -->
   <section class="screen panel" id="screen-settings" hidden>
     <header class="bar"><span class="back" aria-hidden="true">&#8249;</span><span class="title">Settings</span><span class="hint" id="settings-hint"></span></header>
     <div class="list" id="settings-list"></div>
@@ -53,6 +63,10 @@
   <section class="screen panel" id="screen-log" hidden>
     <header class="bar"><span class="back" aria-hidden="true">&#8249;</span><span class="title" id="logtitle">Log</span><span class="hint" id="busy"></span></header>
     <div class="log" id="log"></div>
+    <div class="logbar" id="logbar" hidden>
+      <button class="pill" id="usb-btn" disabled>Copy to USB storage</button>
+      <span class="usb-hint" id="usb-hint"></span>
+    </div>
   </section>
 
   <!-- ===== job overlay (shown over any screen while a job runs) ===== -->
@@ -64,15 +78,12 @@
     </div>
   </div>
 
-  <!-- ===== exit dialog ===== -->
+  <!-- ===== dialog (exit, and confirmations) ===== -->
   <div class="modal" id="modal" hidden>
     <div class="box">
-      <p class="mtitle">Exit Own Your Glass?</p>
-      <p class="mtext">Everything applied stays in place while the app is closed.</p>
-      <div class="mbtns">
-        <button class="pill" data-m="stay">Stay</button>
-        <button class="pill" data-m="exit">Exit</button>
-      </div>
+      <p class="mtitle" id="mtitle"></p>
+      <p class="mtext" id="mtext"></p>
+      <div class="mbtns" id="mbtns"></div>
     </div>
   </div>
 </div>
