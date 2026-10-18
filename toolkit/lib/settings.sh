@@ -5,8 +5,7 @@
 # reported are sent: settingsservice rejects a whole call over one unknown
 # key, and keys come and go between firmware versions (homeSense* and
 # autoBackupEnabled exist only on webOS 11).
-# settings_restore <category>: puts the recorded values back.
-# SETTINGS_CHANGED: after settings_apply, the keys it changed.
+# settings_restore <category>: puts the recorded values back (1 = refused).
 
 # The reply to getSystemSettings is pretty-printed JSON; keep only its
 # "settings" object (python3 where it exists; otherwise by brace depth: a
@@ -35,23 +34,17 @@ _settings_filter() {  # _settings_filter <wanted> <reply settings object>
 w, h = json.loads(sys.argv[1]), json.loads(sys.argv[2] or "{}")
 print(json.dumps({k: v for k, v in w.items() if k in h}, separators=(",", ":")))' "$1" "$2" 2>/dev/null
     elif [ -n "${SETTINGS_PAIRS:-}" ]; then
-        printf '%s\n' "$SETTINGS_PAIRS" | awk -F'|' -v h="$2" 'NF >= 2 && index(h, "\"" $1 "\"") { o = o (o == "" ? "" : ",") "\"" $1 "\":" substr($0, length($1) + 2) } END { print "{" o "}" }'
+        printf '%s\n' "$SETTINGS_PAIRS" | awk -F'|' -v h="$2" 'NF >= 2 && index(h, "\"" $1 "\"") { o = o sep "\"" $1 "\":" substr($0, length($1) + 2); sep = "," } END { print "{" o "}" }'
     else printf '%s' "$1"; fi
 }
 
 settings_apply() {  # settings_apply <category> <json object of private values>
-    SETTINGS_CHANGED=""
     command -v luna-send >/dev/null 2>&1 || return 0
     _cat=$1; _want=$2
     _cur=$(luna luna://com.webos.settingsservice/getSystemSettings "{\"category\":\"$_cat\",\"keys\":[\"$(_settings_keys "$_want")\"]}" | _settings_obj)
     case $_cur in \{*\}) ;; *) warn "could not read $_cat settings"; kv_set "settings_failed.$_cat" 1; return 1 ;; esac
     _send=$(_settings_filter "$_want" "$_cur")
     [ "$_send" = "{}" ] && { info "none of the $_cat settings exist on this TV"; return 0; }
-    # the keys this call actually changes, for a hook that needs to know
-    # (without python3: all of them)
-    SETTINGS_CHANGED=$(python3 -c 'import json,sys
-s, c = json.loads(sys.argv[1]), json.loads(sys.argv[2])
-print(" ".join(k for k in s if c.get(k) != s[k]))' "$_send" "$_cur" 2>/dev/null) || SETTINGS_CHANGED=$(_settings_keys "$_send" | sed 's/","/ /g')
     # the previous values, recorded the first time each key is changed (a
     # newer version may add keys to a category recorded long ago)
     _rec=$(kv_get "settings.$_cat")
@@ -75,6 +68,7 @@ settings_restore() {  # settings_restore <category>
     [ "$OYG_DRYRUN" = 1 ] && { info "(dry-run) restore $1 settings"; return 0; }
     case $_prev in
         \{\}) ;;
-        \{*\}) luna_ok luna://com.webos.settingsservice/setSystemSettings "{\"category\":\"$1\",\"settings\":$_prev}" && ok "settings ($1) restored" || warn "could not restore the $1 settings (their record is kept)" ;;
+        \{*\}) if luna_ok luna://com.webos.settingsservice/setSystemSettings "{\"category\":\"$1\",\"settings\":$_prev}"; then ok "settings ($1) restored"
+               else warn "could not restore the $1 settings (their record is kept)"; return 1; fi ;;
     esac
 }

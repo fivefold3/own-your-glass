@@ -437,9 +437,15 @@
     if (signsOut(members)) then = function () { ask("Block your LG account?", SIGNOUT_TEXT, "Block and switch", "Cancel", go); };
     if (p && p.warning) ask("Apply " + p.name + "?", p.warning, "Apply anyway", "Cancel", then); else then();
   }
+  // Only what differs from the base preset is written. An option left as the
+  // base has it keeps following the base, so a protection a later version
+  // adds to it, or one verified since, reaches this selection too (writing
+  // every option froze an untested one as off for good).
   function saveCustom() {
     var base = meta.preset === "custom" ? (meta.custom_base || "recommended") : (meta.preset || "recommended");
-    var args = ["base=" + base].concat(opts.map(function (o) { return o.id + "=" + (wantOn(o.id) ? "on" : "off"); }));
+    var p = presetById(base), members = p ? p.members : [];
+    var args = ["base=" + base].concat(opts.filter(function (o) { return wantOn(o.id) !== (members.indexOf(o.id) >= 0); })
+      .map(function (o) { return o.id + "=" + (wantOn(o.id) ? "on" : "off"); }));
     job("Saving your selection", "set " + args.join(" "));   // turning the sign-out option on already asked (its warning)
   }
   function toggleOption(o) {

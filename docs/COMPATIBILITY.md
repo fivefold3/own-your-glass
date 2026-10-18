@@ -166,9 +166,15 @@ Gateway names routed nowhere: `sdp_search`, `sdp_nlp`.
 
 ### Screen-capture shield (`capture`)
 
-Hides the screen captures the OLED service keeps. Also blocks a vendor video-plane grabber.
+Hides the screen captures the OLED service keeps. OLED care keeps working: the panel service still gets its captures, and status checks that it does. Also blocks a vendor video-plane grabber.
 
 Presets: Recommended, Strict, Lockdown. Since 1.4.
+
+### Screenshot shield (`screenshots`)
+
+Keeps the TV's other screenshots away from apps and phones. **Breaks:** Screenshots from phone remote apps. Hides Home's Recents pictures, and the LG account folder they are filed under, from apps; stops paired phone apps asking for a screenshot (a phone connected since start-up keeps it until a restart). Verified on the C5: Recents keeps its pictures, and a paired phone app still connects and controls the TV.
+
+Presets: Recommended, Strict, Lockdown. Since 1.6.0.
 
 ## Casting and phones
 
@@ -201,15 +207,24 @@ Presets: Strict, Lockdown. Since 1.4.
 
 ### Phone apps and second screen (`phone`)
 
-Stops phones controlling the TV over the network. **Breaks:** Phone remote apps, launching apps from a phone, LG Link. Turned off again, phone remote apps need a TV restart (LG's phone server starts only with the TV); the app offers one.
+Stops phones controlling the TV over the network. **Breaks:** Phone remote apps, LG Link. Turned off again, phone remote apps need a TV restart (LG's phone server starts only with the TV); the app offers one. Phone apps starting apps on the TV is the separate DIAL option.
 
 Presets: Strict, Lockdown. Since 1.4.
 
 | service | 5.6 | 6.5 | 8.3 | 9.2 | 10.3 | 11.2 | what |
 |---|---|---|---|---|---|---|---|
 | `appcasting` | · | ● | ● | ● | ● | ● | Turns a phone screen share into an app deeplink; LG can deliver a Python script it runs as root. |
-| `dial-discovery` | ● | ● | ● | ● | ● | ● | DIAL server (JS, unified server): phone apps launch YouTube or Netflix on the TV; unauthenticated app launch and power-off from the LAN. |
 | `lglink` | · | · | · | · | · | ● | LG Link (webOS 11): file transfer and 'gramlink' with LG PCs and phones; insecure gRPC on :50051 and socket.io on :50052. |
+
+### Phone apps starting TV apps (DIAL) (`dial`)
+
+Stops phone apps finding the TV and starting apps on it. **Breaks:** Casting from a phone app (Spotify, YouTube and others) when its app is not already open on the TV: open it on the TV first. DIAL lets any device on your network start apps on the TV and turn it off, without asking. Its ports are closed by a firewall rule as well, so the block holds even when DIAL loaded before Own Your Glass at start-up. A computer on the LAN firewall's allow list (oyg lan allow <ip>) still gets through.
+
+Presets: Strict, Lockdown. Since 1.6.0.
+
+| service | 5.6 | 6.5 | 8.3 | 9.2 | 10.3 | 11.2 | what |
+|---|---|---|---|---|---|---|---|
+| `dial-discovery` | ● | ● | ● | ● | ● | ● | DIAL server (JS, unified server): phone apps find the TV and launch Spotify, YouTube and others on it (Spotify registers as com.spotify.Spotify.TVv2); unauthenticated app launch and power-off from the LAN. |
 
 ### Screen Share (`miracast`)
 
@@ -234,6 +249,16 @@ Presets: Strict, Lockdown. Since 1.4.
 Closes the TV to all inbound connections from your local network. **Breaks:** SSH, AirPlay, Google Cast, phone apps, Screen Share, network devices in Universal Control. Replies to connections the TV makes itself (streaming, browsing) still get through. IPv6 is off while it is on (the firewall cannot filter it). `oyg lan allow <ip>` lets a device through, for example your computer for SSH; otherwise turn the firewall off from the app on the TV.
 
 Presets: Strict, Lockdown. Since 1.4.
+
+### Network printing port (`printing`)
+
+Closes the TV's print server (port 515), which takes print jobs from anyone on your network. Nothing on the TV prints through it. Closed on IPv4 and IPv6 alike.
+
+Presets: Recommended, Strict, Lockdown. Since 1.6.0.
+
+| service | 5.6 | 6.5 | 8.3 | 9.2 | 10.3 | 11.2 | what |
+|---|---|---|---|---|---|---|---|
+| `lpd` | · | · | · | · | ● | ● | CUPS's LPD print server: systemd listens on port 515 on every address (IPv4 and IPv6) and starts cups-lpd (user lp) for each connection, with no login, to hand the job to the TV's CUPS scheduler. Enabled on every webOS 10 and 11 image surveyed; nothing on the TV prints through it. |
 
 ## LG cloud and smart home
 
@@ -343,6 +368,12 @@ Presets: Recommended, Strict, Lockdown. Since 1.4.
 | service | 5.6 | 6.5 | 8.3 | 9.2 | 10.3 | 11.2 | what |
 |---|---|---|---|---|---|---|---|
 | `remotediag` | ● | ● | ● | ● | ● | ● | RemoteOne: LG support can push SSH keys, install dropbear, capture the screen, send keys, reboot and factory-reset the TV. |
+
+### Web-app debugger (`debugger`)
+
+Closes the web-app debugger (port 9998) to your network. **Breaks:** Opening a web app's DevTools directly from a computer (ares-inspect and ssh -L 9998:localhost:9998 still work). The TV always runs it, with no password. Verified on the C5: computers on the network are refused, and it stays reachable from the TV itself. A computer on the LAN firewall's allow list (oyg lan allow <ip>) still gets through.
+
+Presets: Recommended, Strict, Lockdown. Since 1.6.0.
 
 ### Block LG account (`account`)
 

@@ -7,7 +7,7 @@
 # uninstalled) replays those records to put the TV back. No module needs its
 # own undo bookkeeping.
 
-OYG_VERSION="1.5.0"
+OYG_VERSION="1.6.0"
 
 OYG_APPID=${OYG_APPID:-org.ownyourglass.app}
 OYG_APPDIR=${OYG_APPDIR:-/media/developer/apps/usr/palm/applications/$OYG_APPID}
@@ -182,8 +182,9 @@ bind_file_ro() {  # bind_file_ro <src> <target>
 }
 unbind_src() {  # unbind_src <src>: whatever peers of our file are still mounted
     [ "$OYG_DRYRUN" = 1 ] && return 0
-    for _m in $(bind_peers "$1"); do umount "$_m" >/dev/null 2>&1 || umount -l "$_m" >/dev/null 2>&1; done
-    mounts_snapshot
+    _ub=0
+    for _m in $(bind_peers "$1"); do umount "$_m" >/dev/null 2>&1 || umount -l "$_m" >/dev/null 2>&1; _ub=1; done
+    [ $_ub = 0 ] || mounts_snapshot   # the mount table is large once applied: read it again only if it changed
 }
 # peers of our file that are still writable (status: no mountinfo read)
 rw_peers() { for _m in $(kv_get "peers.${1##*/}"); do is_mounted "$_m" && is_rw "$_m" && printf '%s\n' "$_m"; done; }
@@ -253,8 +254,8 @@ restore_chains() {  # iptables chains we made (jumped to from INPUT)
     state_list chains | while read -r _c; do
         [ -n "$_c" ] || continue
         [ "$OYG_DRYRUN" = 1 ] && { info "(dry-run) remove firewall chain $_c"; continue; }
-        while iptables -D INPUT -j "$_c" 2>/dev/null; do :; done
-        iptables -F "$_c" 2>/dev/null; iptables -X "$_c" 2>/dev/null && info "firewall chain $_c removed"
+        while ipt -D INPUT -j "$_c"; do :; done
+        ipt -F "$_c"; ipt -X "$_c" && info "firewall chain $_c removed"
     done
     state_drop chains
 }
@@ -327,7 +328,7 @@ kill_pids() {  # kill_pids "<what>" pid...
     _t=0; while [ $_t -lt 10 ]; do
         _left=""; for _i in $_p; do [ -d "/proc/$_i" ] && _left="$_left $_i"; done
         [ -z "$_left" ] && break
-        sleep 0.1; _t=$((_t+1))
+        nap 0.1; _t=$((_t+1))
     done
     if [ -n "$_left" ]; then info "KILL $_w ($_left)"; for _i in $_left; do kill -KILL "$_i" 2>/dev/null; done; fi
     ps_snapshot
@@ -406,6 +407,7 @@ same_boot() {  # same_boot <stamp>
     _sb=$((_sb - $1)); [ "${_sb#-}" -le 120 ]
 }
 restart_reasons() { [ -f "$OYG_RESTART" ] && same_boot "$(head -1 "$OYG_RESTART")" && sed 1d "$OYG_RESTART"; return 0; }
+restart_list() { restart_reasons | awk 'NF { o = o sep $0; sep = ", " } END { printf "%s", o }'; }   # the reasons on one line
 _restart_write() {  # _restart_write <reason to drop> [reason to add]
     [ "$OYG_DRYRUN" = 1 ] && return 0
     _rw=$(restart_reasons | grep -vxF -- "$1"; [ -n "${2:-}" ] && printf '%s\n' "$2")
@@ -446,7 +448,77 @@ toast_after_boot() {
     toast "$1"
 }
 
+# -------------------------------------------------------------- network --
+# iptables, with the xtables lock where it has one (-w)
+ipt() { iptables -w "$@" 2>/dev/null || iptables "$@" 2>/dev/null; }
+# the devices that may still connect (oyg lan allow): the LAN firewall and
+# the port chains (debugger, DIAL) let them through
+LAN_ALLOW="$OYG_ROOT/lan-allow"
+LAN_IFACES="eth0 wlan0"
+# A chain that refuses TCP ports to the network, for ipt_chain: loopback and
+# the allow list pass. It holds whoever listens, a service that loaded
+# before the boot hook included.
+ports_rules() {  # ports_rules <chain> <port>...
+    _prc=$1; shift
+    ipt -A "$_prc" -i lo -j RETURN || return 1
+    if [ -f "$LAN_ALLOW" ]; then
+        for _pra in $(grep -v '^#' "$LAN_ALLOW"); do ipt -A "$_prc" -s "$_pra" -j RETURN || return 1; done
+    fi
+    for _prp; do
+        ipt -A "$_prc" -p tcp --dport "$_prp" -j REJECT --reject-with tcp-reset || ipt -A "$_prc" -p tcp --dport "$_prp" -j DROP || return 1
+    done
+}
+# the chain is in place and refuses every one of the ports
+ports_closed() {  # ports_closed <chain> <port>...
+    _pcc=$1; shift
+    ipt -C INPUT -j "$_pcc" || return 1
+    for _pcp; do
+        ipt -C "$_pcc" -p tcp --dport "$_pcp" -j REJECT --reject-with tcp-reset || ipt -C "$_pcc" -p tcp --dport "$_pcp" -j DROP || return 1
+    done
+}
+# the TV has an IPv6 address on a LAN interface (netfilter here is IPv4
+# only). Addresses, not the switch: an unplugged Ethernet port has IPv6
+# enabled. A Wi-Fi Direct link (Screen Share) has a link-local address of
+# its own, which no one on the LAN can reach.
+ipv6_reachable() { awk -v i=" $LAN_IFACES " 'index(i, " " $6 " ") { f = 1 } END { exit !f }' "$OYG_PROC/net/if_inet6" 2>/dev/null; }
+# ipt_chain <chain> <function>: (re)build a chain jumped to first from INPUT.
+# The function adds the rules to the chain named in its $1 (1 = a rule was
+# refused). The chain is built complete under a new name, the jump moves to
+# it and the old one goes: flushing the live chain in place opened every
+# port it guards until the rules were back. Recorded for generic restore.
+# 1 = iptables refused something, and the jump may not be in place.
+ipt_chain() {
+    _icc=$1; _icn="${1}_N"
+    # what a run cut short left: its jump too, or the chain cannot go and
+    # no later apply could build one
+    while ipt -D INPUT -j "$_icn"; do :; done
+    ipt -F "$_icn"; ipt -X "$_icn"
+    ipt -N "$_icn" || return 1
+    state_add chains "$_icc"; state_add chains "$_icn"
+    if ! { "$2" "$_icn" && ipt -I INPUT 1 -j "$_icn"; }; then
+        ipt -D INPUT -j "$_icn"; ipt -F "$_icn"; ipt -X "$_icn"; state_del chains "$_icn"; return 1
+    fi
+    while ipt -D INPUT -j "$_icc"; do :; done
+    ipt -F "$_icc"; ipt -X "$_icc"
+    ipt -E "$_icn" "$_icc" && state_del chains "$_icn"
+    ipt -C INPUT -j "$_icc"
+}
+# port_listening <port> [v6]: something listens on that TCP port, on IPv4 or
+# IPv6 (v6: IPv6 only). A socket table the kernel lacks is skipped: awk stops
+# at an operand it cannot open, before it can answer.
+port_listening() {
+    _plf=""
+    [ "${2:-}" = v6 ] || { [ -r "$OYG_PROC/net/tcp" ] && _plf="$OYG_PROC/net/tcp"; }
+    [ -r "$OYG_PROC/net/tcp6" ] && _plf="$_plf $OYG_PROC/net/tcp6"
+    [ -n "$_plf" ] || return 1
+    # shellcheck disable=SC2086
+    awk -v p="$(printf '%04X' "$1")" 'FNR > 1 && $4 == "0A" { split($2, a, ":"); if (a[2] == p) f = 1 } END { exit !f }' $_plf
+}
+
 # ----------------------------------------------------------------- misc --
+# nap <seconds, e.g. 0.1>: BusyBox before 1.31 (webOS 5.6, 6.5) has no
+# fractional sleep, but every image has usleep
+nap() { sleep "$1" 2>/dev/null || usleep "$(awk -v s="$1" 'BEGIN { printf "%d", s * 1000000 }')" 2>/dev/null || sleep 1; }
 json_str() { sed -n "s/.*\"$2\"[[:space:]]*:[[:space:]]*\"\([^\"]*\)\".*/\1/p" "$1" 2>/dev/null | head -1; }
 # the {...} value of the first "<key>" in the JSON on stdin, found by brace
 # depth, so a pretty-printed reply and a one-line one read the same (the
@@ -582,6 +654,12 @@ oyg_migrate() {
         _b=$(backup_path /var/luna/preferences/eula)
         [ -f "$_b" ] && mkdir -p "$OYG_BACKUP/legacy" && mv "$_b" "$OYG_BACKUP/legacy/" && log "  kept the 1.2.x consent-cache backup aside ($OYG_BACKUP/legacy)"
     done
+    # 1.5.1 and older: the LAN firewall stopped the printing socket. Its record
+    # goes to the printing option before any restore pass reads it, or undoing
+    # the firewall would start the port behind the printing option's back.
+    command -v lan_handover_lpd >/dev/null 2>&1 && { _omm=$OYG_MOD; OYG_MOD=lan; lan_handover_lpd; OYG_MOD=$_omm; }
+    # Custom files saved before 1.5.5 (every option written)
+    command -v custom_migrate >/dev/null 2>&1 && custom_migrate
     return 0
 }
 

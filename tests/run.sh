@@ -171,7 +171,7 @@ check "modes: /dev/null is refused" eval '! set_mode /dev/null 000 2>/dev/null'
 # ---------------------------------------------------------------- binds --
 mkdir -p "$F/fs/bin" "$F/fs/usr/sbin" "$F/fs/sbin"
 : > "$F/fs/bin/busybox"; ln -s ../../bin/busybox "$F/fs/usr/sbin/telnetd"; : > "$F/fs/usr/sbin/acr2"; ln -s ../usr/sbin/acr2 "$F/fs/sbin/acr2"
-check "bind: an applet link to a multi-call binary is refused" eval '! OYG_DRYRUN=1 bind_null "$F/fs/usr/sbin/telnetd" >/dev/null'
+check "bind: an applet link to a multi-call binary is refused" eval '! ( OYG_DRYRUN=1 bind_null "$F/fs/usr/sbin/telnetd" ) >/dev/null'
 check "bind: a usr-merge link resolves to the real path" eq "$(canon "$F/fs/sbin/acr2")" "$(canon "$F/fs/usr/sbin/acr2")"
 cat > "$OYG_PROC/self/mountinfo" <<EOF
 100 20 0:15 /null /usr/sbin/acr2 rw,relatime shared:1 - devtmpfs devtmpfs rw
@@ -290,16 +290,47 @@ printf 'cpu 1 2 3\nbtime 1790419000\n' > "$OYG_PROC/stat"
 check "restart: a restart empties the list" eq "$(restart_reasons)" ""
 printf 'a79bc963-74eb-4e8c-bb11-997a4e5dbcb5\nPhone remote apps work again\n' > "$OYG_RESTART"
 check "restart: a list stamped with a boot_id (1.4.13-1.4.17) counts as an earlier boot" eq "$(restart_reasons)" ""
-# phone: a restart is asked for only when OYG turned the setting off in this boot
+# phone: the restart is decided once the setting is back (hook_phone_restored):
+# asked whenever OYG had turned phone access off and the TV now has it on,
+# in whatever boot (LG's phone server never comes back within one)
 OYG_MOD=phone; rm -f "$OYG_RESTART" "$OYG_STATE/kv.phone"
-OPT_SETTINGS_CHANGED=" allowMobileDeviceAccess"; hook_phone_apply
-hook_phone_restore >/dev/null
-check "phone: undo in the same boot asks for a restart" eq "$(restart_reasons)" "$PHONE_BACK"
-rm -f "$OYG_RESTART"; kv_set off_boot "1790411163"; hook_phone_restore >/dev/null
-check "phone: after a restart the server comes back by itself" eq "$(restart_reasons)" ""
-OPT_SETTINGS_CHANGED=""; kv_set off_boot "1790419000"; need_restart "$PHONE_BACK" >/dev/null; hook_phone_apply
+mkdir -p "$F/stubp"; printf '#!/bin/sh\nexit 0\n' > "$F/stubp/luna-send"; chmod 755 "$F/stubp/luna-send"   # the hook checks it exists
+# a settings service whose state outlives the $(...) subshells: $F/pv holds
+# the TV's value, $F/pv.refuse makes setSystemSettings answer false
+luna() {
+    case $1 in
+        */setSystemSettings) [ -f "$F/pv.refuse" ] && { echo '{"returnValue":false}'; return 0; }
+            case $2 in *'"allowMobileDeviceAccess":true'*) echo true > "$F/pv" ;; *'"allowMobileDeviceAccess":false'*) echo false > "$F/pv" ;; esac
+            echo '{"returnValue":true}' ;;
+        */getSystemSettings) printf '{\n    "returnValue": true,\n    "settings": {\n        "allowMobileDeviceAccess": %s\n    }\n}\n' "$(cat "$F/pv")" ;;
+    esac
+}
+rm -f "$F/pv.refuse"; echo true > "$F/pv"
+kv_set settings.network '{"allowMobileDeviceAccess":true}'
+(PATH="$F/stubp:$PATH"; hook_phone_restored >/dev/null)
+check "phone: access back on after the undo asks for a restart" eq "$(restart_reasons)" "$PHONE_BACK"
+rm -f "$OYG_RESTART"; printf 'cpu 1 2 3\nbtime 1790500000\n' > "$OYG_PROC/stat"
+(PATH="$F/stubp:$PATH"; hook_phone_restored >/dev/null)
+check "phone: so does an undo in a later boot than the one that turned it off" eq "$(restart_reasons)" "$PHONE_BACK"
+rm -f "$OYG_RESTART"; kv_set settings.network '{"allowMobileDeviceAccess":false}'
+(PATH="$F/stubp:$PATH"; hook_phone_restored >/dev/null)
+check "phone: access the owner had off before asks for nothing" eq "$(restart_reasons)" ""
+# the whole undo, in opt_restore's order: OYG turned access off, the owner
+# turned it on again in LG's menus, then the option is undone
+echo true > "$F/pv"; kv_set settings.network '{"allowMobileDeviceAccess":true}'; kv_set applied 1
+(PATH="$F/stubp:$PATH"; opt_restore phone >/dev/null 2>&1)
+check "phone: access turned on in LG's menus still asks (the server is down until a restart)" eq "$(restart_reasons)" "$PHONE_BACK"
+check "phone: a restore that went through drops the record" eq "$(kv_get settings.network)" ""
+rm -f "$OYG_RESTART"; echo false > "$F/pv"; : > "$F/pv.refuse"; kv_set settings.network '{"allowMobileDeviceAccess":true}'; kv_set applied 1
+(PATH="$F/stubp:$PATH"; opt_restore phone >/dev/null 2>&1)
+check "phone: a restore settingsservice refused promises no restart" eq "$(restart_reasons)" ""
+check "phone: and keeps the record for the next restore" eq "$(kv_get settings.network)" '{"allowMobileDeviceAccess":true}'
+check "phone: the option is no longer applied, its record is still there" eval '! opt_applied phone && has_state phone'
+rm -f "$F/pv.refuse"; OYG_MOD=phone; need_restart "$PHONE_BACK" >/dev/null; hook_phone_apply
 check "phone: turning it on again drops the pending restart" eq "$(restart_reasons)" ""
-check "phone: a boot apply that changes nothing keeps the old boot" eq "$(kv_get off_boot)" "1790419000"
+OYG_MOD=phone; kv_drop; OYG_MOD=test
+_or=$OYG_RESTART; unset -f luna; . "$REPO/toolkit/lib/common.sh"; OYG_RESTART=$_or; log() { :; }
+printf 'cpu 1 2 3\nbtime 1790419000\n' > "$OYG_PROC/stat"
 # Screen Share: a restart is asked for when Miracast was stopped in this boot
 OYG_MOD=miracast; rm -f "$OYG_RESTART" "$OYG_STATE/kv.miracast" "$OYG_STATE/units.miracast"
 hook_miracast_apply; hook_miracast_restore >/dev/null
@@ -335,7 +366,7 @@ check "network: no sink names when no route is cut" eval '! SDX_BLOCK="" NET_HOS
 # read varies between hosts, and under an emulator the group is not seen)
 setsid sh -c 'sleep 30 & sleep 30; :' </dev/null >/dev/null 2>&1 & _g=$!
 sleep 3 & _other=$!
-_n=0; while [ $_n -lt 20 ]; do _gp=$(pgrp_pids "$_g"); [ "$(echo $_gp | wc -w)" -ge 2 ] && break; sleep 0.1; _n=$((_n+1)); done
+_n=0; while [ $_n -lt 20 ]; do _gp=$(pgrp_pids "$_g"); [ "$(echo $_gp | wc -w)" -ge 2 ] && break; nap 0.1; _n=$((_n+1)); done
 check "pgrp: the watcher and its children" eval '[ "$(echo $_gp | wc -w | tr -d " ")" -ge 2 ]'
 check "pgrp: never another process" eval 'case " $_gp " in *" $_other "*) false;; *) true;; esac'
 kill $_gp 2>/dev/null; wait $_other 2>/dev/null
@@ -423,7 +454,7 @@ M="$TDIR/mig"; mkdir -p "$M/state" "$M/backup"
 check "migration: records go to their option" eq "$(cat "$M/state/mounts.acr" 2>/dev/null)/$(cat "$M/state/mounts.promos" 2>/dev/null)/$(cat "$M/state/mounts.ads" 2>/dev/null)" "/usr/sbin/acr2//usr/sbin/contentminer//usr/sbin/admanager"
 check "migration: jailed copies by their host path" eq "$(cat "$M/state/mounts.voice" 2>/dev/null)" "/var/palm/jail/lg.thinqai.adapter/usr/sbin/lg.thinqai.adapter"
 check "migration: released services go to legacy" eq "$(cat "$M/state/mounts.legacy" 2>/dev/null)" "/usr/sbin/airessrvallocator"
-check "migration: units and launch names by owner" eq "$(cat "$M/state/units.cast" 2>/dev/null)/$(cat "$M/state/ls2.phone" 2>/dev/null)" "chromecast-provisioning.service/com.webos.service.dial"
+check "migration: units and launch names by owner" eq "$(cat "$M/state/units.cast" 2>/dev/null)/$(cat "$M/state/ls2.dial" 2>/dev/null)" "chromecast-provisioning.service/com.webos.service.dial"
 check "migration: resources keep their records" eq "$(cat "$M/state/mounts.sdx")/$(sed -n 's/^prefix_default=//p' "$M/state/kv.sdx")" "/mnt/lg/cmn_data/sdp/sdx/server_addr_version.conf/AU"
 if command -v python3 >/dev/null 2>&1; then
     check "migration: settings split by owning option" eq "$(sed -n 's/^settings.general=//p' "$M/state/kv.ads")|$(sed -n 's/^settings.general=//p' "$M/state/kv.buddy-sports")" '{"adCookie":"on"}|{"sportsAlarm":"on"}'
@@ -577,6 +608,318 @@ kill "$_lh" 2>/dev/null; wait "$_lh" 2>/dev/null
 printf '%s\n1790500000\n' "$_lh" > "$OYG_ROOT/lock/pid"
 check "lock: a dead pid is stale" lock_stale
 rm -rf "$OYG_ROOT/lock"
+
+# screenshots: the phone API without its screenshot calls. One method object
+# goes, with its comma; everything else stays byte for byte, braces and
+# quotes inside strings included.
+cat > "$F/ssg.interface" <<'EOF'
+{
+	"service": "com.example.api",
+	"methods": [
+		{
+			"path": "/first",
+			"description": "a } and a \" in a string { ["
+		},
+		{
+			"path": "/tv/executeOneShot",
+			"requiredPermissions": [
+				"CONTROL_DISPLAY"
+			],
+			"resources": {
+				"media": {
+					"responseProperties": [
+						"imageUri"
+					]
+				}
+			}
+		},
+		{
+			"path": "/last"
+		}
+	]
+}
+EOF
+cat > "$F/ssg.mid" <<'EOF'
+{
+	"service": "com.example.api",
+	"methods": [
+		{
+			"path": "/first",
+			"description": "a } and a \" in a string { ["
+		},
+		{
+			"path": "/last"
+		}
+	]
+}
+EOF
+ssg_drop /tv/executeOneShot < "$F/ssg.interface" > "$F/ssg.out"
+check "screenshots: a method in the middle goes with its comma" cmp -s "$F/ssg.out" "$F/ssg.mid"
+ssg_drop /last < "$F/ssg.mid" > "$F/ssg.out"
+check "screenshots: the last method takes the comma before it" eq "$(cat "$F/ssg.out")" "$(sed -n '1,7p;11,$p' "$F/ssg.mid" | sed '7s/},/}/')"
+printf '{\n\t"service": "x",\n\t"methods": [\n\t\t{\n\t\t\t"path": "/executeOneShot"\n\t\t}\n\t]\n}\n' | ssg_drop /executeOneShot > "$F/ssg.out"
+check "screenshots: the only method leaves an empty list" eq "$(tr -d ' \t\n' < "$F/ssg.out")" '{"service":"x","methods":[]}'
+ssg_drop /executeOneShot < "$F/ssg.interface" > "$F/ssg.out"
+check "screenshots: a path that only ends the same is kept" cmp -s "$F/ssg.out" "$F/ssg.interface"
+ssg_drop /first < "$F/ssg.interface" > "$F/ssg.out"
+check "screenshots: braces inside a string do not confuse the depth" eq "$(grep -c '"path"' "$F/ssg.out")/$(sed -n 4p "$F/ssg.out" | tr -d '\t')" "2/{"
+
+# screenshots: Recents directories root-only (the missing one made first),
+# undone from the records; a bind that fails (not root here) is survivable.
+# mount and umount are stubbed as shell functions, never as files on PATH: a
+# BusyBox built with standalone applets (Ubuntu's, on CI) runs its own
+# applet before it looks at PATH, and a function comes before either.
+_sd="$TDIR/snap"; mkdir -p "$_sd/old"; chmod 755 "$_sd/old"
+SNAP_DIRS="$_sd/old $_sd/new"; SNAP_MAKE="$_sd/new"; SSG_IFACES="$F/none"; CAP_DIR="$F/capdir"; SHOT_JPG="$F/capture.jpg"
+(umask 022; mount() { return 1; }; OYG_MOD=screenshots; hook_screenshots_apply >/dev/null 2>&1)
+check "screenshots: Recents directories become 0700" eq "$(stat -c %a "$_sd/old")/$(stat -c %a "$_sd/new" 2>/dev/null)" "700/700"
+check "screenshots: their modes are recorded" eq "$(grep -F "$_sd/" "$OYG_STATE/modes.screenshots" | sort | tr '\n' '|')" "$_sd/new 755|$_sd/old 755|"
+check "screenshots: status says root-only" eq "$(OYG_MOD=screenshots hook_screenshots_status s | head -1)" "s|OK|Recents screenshots root-only"
+(OYG_MOD=screenshots; generic_restore >/dev/null 2>&1)
+check "screenshots: restore puts the modes back and removes the file it made" eq "$(stat -c %a "$_sd/old")/$(stat -c %a "$_sd/new")/$([ -e "$SHOT_JPG" ] && echo left)" "755/755/"
+
+# screenshots and the capture shield, the whole way: fixture interface files,
+# and mount/umount stubs that keep $OYG_PROC/mounts the way the kernel would
+_pm_keep="$F/mounts.keep"; cp "$OYG_PROC/mounts" "$_pm_keep"
+mkdir -p "$F/ssg" "$TDIR/tmp"
+mount() { [ "$1" = --bind ] && printf 'fake %s tmpfs rw 0 0\n' "$3" >> "$OYG_PROC/mounts"; return 0; }
+umount() { _umt=$1; [ "$_umt" = -l ] && _umt=$2; grep -v " $_umt " "$OYG_PROC/mounts" > "$OYG_PROC/mounts.t"; mv "$OYG_PROC/mounts.t" "$OYG_PROC/mounts"; }
+cat > "$F/ssg/com.webos.service.capture.interface" <<'EOF'
+{
+	"service": "com.webos.service.capture",
+	"methods": [
+		{
+			"path": "/executeOneShot",
+			"requiredPermissions": ["CONTROL_DISPLAY"]
+		}
+	]
+}
+EOF
+cat > "$F/ssg/com.webos.service.apiadapter.interface" <<'EOF'
+{
+	"service": "com.webos.service.apiadapter",
+	"methods": [
+		{ "path": "/audio/getVolume", "requiredPermissions": ["READ_STATUS"] },
+		{ "path": "/tv/executeOneShot", "requiredPermissions": ["CONTROL_DISPLAY"], "resources": { "media": { "responseProperties": ["imageUri"] } } },
+		{ "path": "/tv/getCurrentChannel" }
+	]
+}
+EOF
+cat > "$F/ssg/tv.interface" <<'EOF'
+{
+	"virtualService": "tv",
+	"methods": [
+		{ "path": "/getCurrentChannel", "provider": "com.webos.service.apiadapter/tv/getCurrentChannel" },
+		{ "path": "/executeOneShot", "provider": "com.webos.service.apiadapter/tv/executeOneShot" }
+	]
+}
+EOF
+cp -R "$F/ssg" "$F/ssg.orig"
+SNAP_DIRS="$_sd/none"; SNAP_MAKE="$_sd/none"; SSG_IFACES="$F/ssg"; CAP_DIR="$TDIR/run-oyg"; SHOT_JPG="$TDIR/tmp/capture.jpg"
+ss_apply() { (OYG_MOD=screenshots; mounts_snapshot; hook_screenshots_apply; echo "apply went on") > "$F/ss.log" 2>&1; }
+ss_status() { (OYG_MOD=screenshots; mounts_snapshot; hook_screenshots_status s); }
+ss_restore() { (OYG_MOD=screenshots; mounts_snapshot; hook_screenshots_restore >/dev/null 2>&1; generic_restore >/dev/null 2>&1); }
+ss_apply
+check "screenshots: the three phone-API files are bound" eq "$(grep -c "^$F/ssg/" "$OYG_STATE/mounts.screenshots")" "3"
+check "screenshots: each copy is whole JSON without its screenshot call, the rest kept" python3 -c '
+import json, sys
+d = sys.argv[1]
+c = json.load(open(d + "/ssg.com.webos.service.capture.interface"))
+a = json.load(open(d + "/ssg.com.webos.service.apiadapter.interface"))
+t = json.load(open(d + "/ssg.tv.interface"))
+paths = lambda j: [m["path"] for m in j["methods"]]
+sys.exit(0 if (paths(c), paths(a), paths(t)) == ([], ["/audio/getVolume", "/tv/getCurrentChannel"], ["/getCurrentChannel"]) else 1)' "$OYG_ROOT"
+check "screenshots: the files under the binds are untouched" diff -r "$F/ssg" "$F/ssg.orig"
+check "screenshots: the phone screenshot file is shielded from a root-only folder" eq "$(stat -c %a "$CAP_DIR")/$(stat -c %a "$CAP_DIR/capture.jpg")/$(grep -c " $SHOT_JPG " "$OYG_PROC/mounts")" "700/600/1"
+check "screenshots: status after apply" eq "$(ss_status | tail -2 | tr '\n' '|')" "s|OK|phone screenshot calls removed|s|OK|phone screenshot file root-only|"
+OYG_MOD=screenshots; kv_set ssg_stale "$(boot_stamp)"; OYG_MOD=test
+check "screenshots: a gateway that read its calls first is RESIDENT" eval 'ss_status | grep -q "^s|RESIDENT|phone screenshot calls removed, but the phone service read them before"'
+OYG_MOD=screenshots; kv_set ssg_stale ""; OYG_MOD=test
+# undo: a restart where phones can reach the TV, none where they cannot
+_ssp_on=true; luna() { case $1 in */getSystemSettings) printf '{"returnValue": true, "settings": {"allowMobileDeviceAccess": %s}}\n' "$_ssp_on" ;; esac; }
+rm -f "${OYG_RESTART:?}"; (PATH="$F/stubp:$PATH"; ss_restore)
+check "screenshots: undo where phones reach the TV asks for a restart" eq "$(restart_reasons)" "$SHOTS_BACK"
+check "screenshots: undo unbinds and removes the file it made" eq "$(grep -c "$F/ssg/\| $SHOT_JPG " "$OYG_PROC/mounts")/$([ -e "$SHOT_JPG" ] && echo left)" "0/"
+rm -f "${OYG_RESTART:?}"; _ssp_on=false; ss_apply; (PATH="$F/stubp:$PATH"; ss_restore)
+check "screenshots: undo where phones cannot reach the TV asks for nothing" eq "$(restart_reasons)" ""
+# a file without its screenshot call is left as it is, and status counts it as done
+printf '{\n\t"virtualService": "tv",\n\t"methods": [\n\t\t{ "path": "/getCurrentChannel" }\n\t]\n}\n' > "$F/ssg/tv.interface"
+ss_apply
+check "screenshots: a file without the call is not bound" eq "$(grep -c "$F/ssg/tv.interface" "$OYG_STATE/mounts.screenshots")" "0"
+check "screenshots: status counts it as done" eq "$(ss_status | grep 'phone screenshot calls')" "s|OK|phone screenshot calls removed"
+umount_one() { grep -v " $1 " "$OYG_PROC/mounts" > "$OYG_PROC/mounts.t"; mv "$OYG_PROC/mounts.t" "$OYG_PROC/mounts"; }
+umount_one "$F/ssg/com.webos.service.capture.interface"
+check "screenshots: a call file left unbound is reported" eq "$(ss_status | grep 'screenshots (')" "s|WARN|phone apps can take screenshots (1 of 2 calls removed)"
+ss_restore; cp "$F/ssg.orig/tv.interface" "$F/ssg/tv.interface"
+# a copy that does not come out whole is never bound
+printf '{\n\t"service": "x",\n\t"methods": [\n\t\t{ "path": "/a" },\n\t\t{ "pa' > "$F/half.json"
+check "screenshots: a cut-short copy fails the check" eval '! ssg_valid "$F/half.json" /executeOneShot'
+check "screenshots: a whole copy passes it" ssg_valid "$OYG_ROOT/ssg.tv.interface" /executeOneShot
+# a link at a shielded path: left alone, and the apply goes on (a failed
+# redirection used to stop the whole oyg run there)
+rm -f "${SHOT_JPG:?}"; printf 'keep me\n' > "$F/victim"; chmod 644 "$F/victim"; ln -s "$F/victim" "$SHOT_JPG"
+ss_apply
+check "shield: a link at the path is left alone and the apply goes on" eval 'grep -q "is not a plain file: left alone" "$F/ss.log" && grep -q "^apply went on" "$F/ss.log"'
+check "shield: what the link points to is untouched" eq "$(cat "$F/victim")/$(stat -c %a "$F/victim")" "keep me/644"
+check "shield: status reports the link" eval 'ss_status | grep -q "^s|WARN|phone screenshot file is a link"'
+ss_restore; rm -f "${SHOT_JPG:?}"
+# a shield bound by 1.5.5 or older (copy in /tmp) is made again from CAP_DIR
+: > "$SHOT_JPG"; printf 'fake %s tmpfs rw 0 0\n' "$SHOT_JPG" >> "$OYG_PROC/mounts"
+(OYG_MOD=screenshots; state_add mounts "$SHOT_JPG")
+(OYG_MOD=screenshots; mounts_snapshot; shield_file "$SHOT_JPG" >/dev/null 2>&1; echo $? > "$F/rc")
+check "shield: an older build's shield is made again" eq "$(cat "$F/rc")/$(OYG_MOD=screenshots kv_get shadow.capture.jpg)" "0/$CAP_DIR/capture.jpg"
+(OYG_MOD=screenshots; mounts_snapshot; shield_file "$SHOT_JPG" >/dev/null 2>&1; echo $? > "$F/rc")
+check "shield: then it is left as it is" eq "$(cat "$F/rc")" "2"
+# what jails see under a bind is the file itself: emptied and root-only first
+printf 'last frame' > "$TDIR/tmp/frame.rgb"; chmod 644 "$TDIR/tmp/frame.rgb"
+(OYG_MOD=capture; mounts_snapshot; shield_file "$TDIR/tmp/frame.rgb" >/dev/null 2>&1)
+check "shield: the file under the bind is emptied and made root-only first" eq "$(stat -c '%s %a' "$TDIR/tmp/frame.rgb")" "0 600"
+(OYG_MOD=capture; mounts_snapshot; generic_restore >/dev/null 2>&1)
+check "shield: restore unbinds it and gives the mode back" eq "$(grep -c " $TDIR/tmp/frame.rgb " "$OYG_PROC/mounts")/$(stat -c %a "$TDIR/tmp/frame.rgb")" "0/644"
+rm -f "${TDIR:?}/tmp/frame.rgb"
+ss_restore; rm -f "${SHOT_JPG:?}"; _or=$OYG_RESTART; unset -f luna umount_one mount umount; . "$REPO/toolkit/lib/common.sh"; OYG_RESTART=$_or; log() { :; }
+cp "$_pm_keep" "$OYG_PROC/mounts"
+
+# capture: OLED care's screen samples, where it takes any
+EPL_BIN="$F/eplmanager"; printf 'bin\0/tmp/capture.rgb\0' > "$EPL_BIN"; CAP_FILE="$F/capture.rgb"; printf 'x' > "$CAP_FILE"
+EPL_OSD_OFF="$F/osdCaptureDisable"
+printf '42\teplmanager\t/usr/sbin/eplmanager\t/usr/sbin/eplmanager\n' > "$OYG_PSF"
+check "capture: a fresh sample means OLED care is fed" eq "$(capture_oled_status c)" "c|OK|OLED care is getting its screen samples"
+: > "$CAP_FILE"
+check "capture: a fresh shield waits for its first sample" eq "$(capture_oled_status c)" "c|OK|OLED care: waiting for its first screen sample"
+printf 'x' > "$CAP_FILE"; touch -t 202001010000 "$CAP_FILE"
+check "capture: a stale sample is reported" eval 'capture_oled_status c | grep -q "^c|WARN|OLED care has had no screen sample"'
+: > "$EPL_OSD_OFF"
+check "capture: LG's switch-off is said, not warned about" eq "$(capture_oled_status c)" "c|OK|OLED care takes no screen samples here (switched off in LG's test menu)"
+rm -f "${EPL_OSD_OFF:?}"; printf 'bin\0no samples\0' > "$EPL_BIN"
+check "capture: a pixel care that samples nothing (before webOS 10) gets no line" eq "$(capture_oled_status c)" ""
+printf 'bin\0/tmp/capture.rgb\0' > "$EPL_BIN"; printf '1\tinit\t/sbin/init\tinit\n' > "$OYG_PSF"
+check "capture: eplmanager not running (an LCD set) gets no line" eq "$(capture_oled_status c)" ""
+rm -f "${EPL_BIN:?}"
+check "capture: no panel service, nothing to say" eq "$(capture_oled_status c)" ""
+: > "$OYG_PSF"
+check "debugger: no iptables, not available" eq "$(PATH="$TDIR/bin"; hook_debugger_status d)" "d|NA|no iptables on this TV"
+. "$REPO/toolkit/hooks/capture.sh"; . "$REPO/toolkit/hooks/screenshots.sh"
+
+# port_listening: the kernel's socket tables, IPv4 and IPv6, each skipped
+# when the kernel has none
+mkdir -p "$OYG_PROC/net"
+printf '  sl  local_address rem_address   st\n   0: 00000000:0203 00000000:0000 0A\n' > "$OYG_PROC/net/tcp"
+check "port: an IPv4 listener is found with no IPv6 table at all" port_listening 515
+check "port: v6 asks IPv6 only" eval '! port_listening 515 v6'
+printf '  sl  local_address rem_address   st\n   0: 00000000000000000000000000000000:270E 00000000000000000000000000000000:0000 0A\n' > "$OYG_PROC/net/tcp6"
+check "port: an IPv6 listener is found" port_listening 9998 v6
+check "port: a port nobody listens on" eval '! port_listening 23'
+rm -rf "${OYG_PROC:?}/net"
+
+# printing: port 515 read from the kernel's socket tables, IPv4 and IPv6
+mkdir -p "$OYG_PROC/net"; LPD_BIN="$F/cups-lpd"; : > "$LPD_BIN"
+printf '  sl  local_address rem_address   st\n   0: 00000000:0203 00000000:0000 0A\n' > "$OYG_PROC/net/tcp"
+printf '  sl  local_address rem_address   st\n' > "$OYG_PROC/net/tcp6"
+check "printing: a listener on 515 is reported" eq "$(hook_printing_status p)" "p|WARN|printing port 515 still open"
+printf '  sl  local_address rem_address   st\n   0: 00000000:0016 00000000:0000 0A\n' > "$OYG_PROC/net/tcp"
+printf '  sl  local_address rem_address   st\n   0: 00000000000000000000000000000000:0203 00000000000000000000000000000000:0000 06\n' > "$OYG_PROC/net/tcp6"
+check "printing: closed when nothing listens on 515 (a connection winding down is not a listener)" eq "$(hook_printing_status p)" "p|OK|printing port 515 closed"
+printf '  sl  local_address rem_address   st\n   0: 00000000000000000000000000000000:0203 00000000000000000000000000000000:0000 0A\n' > "$OYG_PROC/net/tcp6"
+check "printing: an IPv6 listener counts" eq "$(hook_printing_status p)" "p|WARN|printing port 515 still open"
+rm -f "${LPD_BIN:?}"
+check "printing: no LPD server, nothing to say" eq "$(hook_printing_status p)" ""
+rm -rf "${OYG_PROC:?}/net"; . "$REPO/toolkit/hooks/printing.sh"
+# lan: the printing socket's record (1.5.1 and older) moves to the printing
+# option, from oyg_migrate, before any restore pass
+OYG_MOD=lan; rm -f "${OYG_STATE:?}/units.lan" "${OYG_STATE:?}/units.printing"
+state_add units rdisc.service; state_add units cups-lpd.socket; OYG_MOD=test; oyg_migrate
+check "lan: the printing socket's record moves to the printing option" eq "$(cat "$OYG_STATE/units.lan")/$(cat "$OYG_STATE/units.printing" 2>/dev/null)/$OYG_MOD" "rdisc.service/cups-lpd.socket/test"
+OYG_MOD=lan; lan_handover_lpd; OYG_MOD=test
+check "lan: the handover runs once" eq "$(cat "$OYG_STATE/units.lan")/$(cat "$OYG_STATE/units.printing" 2>/dev/null)" "rdisc.service/cups-lpd.socket"
+rm -f "${OYG_STATE:?}/units.lan" "${OYG_STATE:?}/units.printing"
+
+# firewall chains: built under a new name and swapped in, never flushed while
+# INPUT jumps to them; a refused rule leaves the chain that was there
+IPT_DIR="$F/ipt"; mkdir -p "$IPT_DIR" "$F/stubi"; : > "$IPT_DIR/INPUT"; export IPT_DIR
+cat > "$F/stubi/iptables" <<'EOF'
+#!/bin/sh
+# a stateful iptables: one file per chain, a rule per line; $IPT_LOG gets
+# every call, $IPT_FAIL makes appends containing it fail
+[ "$1" = -w ] && shift
+op=$1; c=$2; shift 2; d=${IPT_DIR:?}
+[ -n "${IPT_LOG:-}" ] && printf '%s %s %s\n' "$op" "$c" "$*" >> "$IPT_LOG"
+case $op in
+    -N) [ -e "$d/$c" ] && exit 1; : > "$d/$c" ;;
+    -F) [ -e "$d/$c" ] || exit 1; : > "$d/$c" ;;
+    -X) [ -e "$d/$c" ] && [ ! -s "$d/$c" ] || exit 1; grep -qx -- "-j $c" "$d/INPUT" && exit 1; rm -f "${d:?}/${c:?}" ;;
+    -A) [ -e "$d/$c" ] || exit 1; case " $* " in *"${IPT_FAIL:-@@}"*) exit 1 ;; esac; printf '%s\n' "$*" >> "$d/$c" ;;
+    -I) [ -e "$d/$c" ] || exit 1; shift; { printf '%s\n' "$*"; cat "$d/$c"; } > "$d/$c.t"; mv "$d/$c.t" "$d/$c" ;;
+    -C) [ -e "$d/$c" ] && grep -qxF -- "$*" "$d/$c" ;;
+    -D) [ -e "$d/$c" ] && grep -qxF -- "$*" "$d/$c" || exit 1; grep -vxF -- "$*" "$d/$c" > "$d/$c.t"; mv "$d/$c.t" "$d/$c" ;;
+    -E) [ -e "$d/$c" ] && [ ! -e "$d/$1" ] || exit 1; mv "$d/$c" "$d/$1"; for f in "$d"/*; do sed -i "s/^-j $c\$/-j $1/" "$f"; done ;;
+esac
+EOF
+chmod 755 "$F/stubi/iptables"
+ipt_run() { (PATH="$F/stubi:$PATH"; log() { printf '%s\n' "$*"; }; OYG_MOD=$1; shift; "$@") 2>&1; }
+ipt_run debugger hook_debugger_apply > "$F/ipt.out"
+check "firewall: the debugger chain refuses 9998 except on loopback" eq "$(tr '\n' '|' < "$IPT_DIR/OYG_DBG")/$(cat "$IPT_DIR/INPUT")" "-i lo -j RETURN|-p tcp --dport 9998 -j REJECT --reject-with tcp-reset|/-j OYG_DBG"
+check "firewall: nothing is left of the build, and the chain is recorded" eq "$(ls "$IPT_DIR" | tr '\n' ' ')/$(cat "$OYG_STATE/chains.debugger")" "INPUT OYG_DBG /OYG_DBG"
+check "firewall: status says closed" eq "$(ipt_run debugger hook_debugger_status d)" "d|OK|web-app debugger closed to the network"
+printf '192.168.1.50\n' > "$LAN_ALLOW"; IPT_LOG="$F/ipt.log"; export IPT_LOG; : > "$IPT_LOG"
+ipt_run debugger hook_debugger_apply > "$F/ipt.out"; unset IPT_LOG
+check "firewall: a computer on the allow list gets through" eval 'grep -qx -- "-s 192.168.1.50 -j RETURN" "$IPT_DIR/OYG_DBG"'
+check "firewall: a re-apply moves the jump to the new chain before the old one is flushed" eval '
+    i=$(grep -n "^-I INPUT 1 -j OYG_DBG_N" "$F/ipt.log" | cut -d: -f1); r=$(grep -n "^-A OYG_DBG_N -p tcp --dport 9998" "$F/ipt.log" | cut -d: -f1); f=$(grep -n "^-F OYG_DBG \$" "$F/ipt.log" | cut -d: -f1)
+    [ -n "$i" ] && [ -n "$r" ] && [ -n "$f" ] && [ "$r" -lt "$i" ] && [ "$i" -lt "$f" ]'
+IPT_FAIL="--dport"; export IPT_FAIL; ipt_run debugger hook_debugger_apply > "$F/ipt.out"; unset IPT_FAIL
+check "firewall: a refused rule says so" eval 'grep -q "could not close the web-app debugger" "$F/ipt.out"'
+check "firewall: and leaves the chain that was there" eq "$(ipt_run debugger hook_debugger_status d)/$(ls "$IPT_DIR" | tr '\n' ' ')" "d|OK|web-app debugger closed to the network/INPUT OYG_DBG "
+: > "$IPT_DIR/OYG_DBG"
+check "firewall: status needs the rule, not only the jump" eq "$(ipt_run debugger hook_debugger_status d)" "d|WARN|web-app debugger open to the network"
+# a run cut short after the jump moved to the build chain and before the
+# rename: the next apply takes that chain's jump off first and builds anew
+rm -f "$IPT_DIR/OYG_DBG"; printf -- '-i lo -j RETURN\n-p tcp --dport 9998 -j REJECT --reject-with tcp-reset\n' > "$IPT_DIR/OYG_DBG_N"; printf -- '-j OYG_DBG_N\n' > "$IPT_DIR/INPUT"
+ipt_run debugger hook_debugger_apply > "$F/ipt.out"
+check "firewall: a build chain a cut-short run left in INPUT is replaced" eq "$(ls "$IPT_DIR" | tr '\n' ' ')/$(cat "$IPT_DIR/INPUT")/$(ipt_run debugger hook_debugger_status d)" "INPUT OYG_DBG /-j OYG_DBG/d|OK|web-app debugger closed to the network"
+# DIAL: both ports, whoever answers them (a service loaded before the hook)
+ipt_run dial hook_dial_apply > "$F/ipt.out"
+check "firewall: the DIAL chain refuses both ports, loopback and the allow list excepted" eq "$(tr '\n' '|' < "$IPT_DIR/OYG_DIAL")" "-i lo -j RETURN|-s 192.168.1.50 -j RETURN|-p tcp --dport 36866 -j REJECT --reject-with tcp-reset|-p tcp --dport 18181 -j REJECT --reject-with tcp-reset|"
+mkdir -p "$OYG_PROC/net"; printf '00000000000000000000000000000001 01 80 10 80       lo\n' > "$OYG_PROC/net/if_inet6"
+check "firewall: DIAL status says closed (loopback is not IPv6 on the network)" eq "$(ipt_run dial hook_dial_status x)" "x|OK|DIAL closed to the network"
+printf 'fe80000000000000021122fffe334455 03 40 20 80    wlan0\n' >> "$OYG_PROC/net/if_inet6"
+check "firewall: DIAL status warns when the TV has an IPv6 address" eq "$(ipt_run dial hook_dial_status x | tail -1)" "x|WARN|the TV has an IPv6 address, which the firewall cannot cover (the LAN firewall option turns IPv6 off)"
+printf '00000000000000000000000000000001 01 80 10 80       lo\nfe80000000000000021122fffe334456 05 40 20 80     p2p0\n' > "$OYG_PROC/net/if_inet6"
+check "firewall: a Wi-Fi Direct link's own address is not on the LAN" eq "$(ipt_run dial hook_dial_status x)" "x|OK|DIAL closed to the network"
+rm -f "${OYG_PROC:?}/net/if_inet6"
+check "firewall: no IPv6 table, no warning" eq "$(ipt_run dial hook_dial_status x)" "x|OK|DIAL closed to the network"
+grep -vx -- "-p tcp --dport 18181 -j REJECT --reject-with tcp-reset" "$IPT_DIR/OYG_DIAL" > "$F/ipt.t"; mv "$F/ipt.t" "$IPT_DIR/OYG_DIAL"
+check "firewall: DIAL status needs every port" eq "$(ipt_run dial hook_dial_status x)" "x|WARN|DIAL open to the network"
+ipt_run lan hook_lan_apply > "$F/ipt.out"
+check "firewall: the LAN chain refuses new connections, the allow list excepted" eval 'grep -qx -- "-p tcp --syn -j REJECT --reject-with tcp-reset" "$IPT_DIR/OYG_LAN" && grep -qx -- "-s 192.168.1.50 -j RETURN" "$IPT_DIR/OYG_LAN" && [ "$(ipt_run lan hook_lan_status l | head -1)" = "l|OK|closed to incoming connections" ]'
+(PATH="$F/stubi:$PATH"; for _o in lan debugger dial; do OYG_MOD=$_o; restore_chains; done) >/dev/null 2>&1
+check "firewall: restore takes the chains and their jumps away" eq "$(ls "$IPT_DIR" | tr '\n' ' ')/$(cat "$IPT_DIR/INPUT")" "INPUT /"
+rm -f "${LAN_ALLOW:?}" "${OYG_STATE:?}/chains.debugger" "${OYG_STATE:?}/chains.lan" "${OYG_STATE:?}/chains.dial"; unset IPT_DIR
+
+# Custom: only what differs from the base preset is kept (format=2), and a
+# file saved before 1.5.5 (every option written) is rewritten once
+_in=$(printf '%s\n' $(pv recommended) | head -1); _out=$(for o in $OYG_OPTIONS; do case " $(pv recommended) " in *" $o "*) ;; *) echo "$o"; break ;; esac; done)
+printf '%s=on\n%s=off\n%s=on\n' "$_in" "$_out" voice | custom_write recommended
+check "custom: lines that match the base go" eq "$(grep -c "^$_in=\|^$_out=" "$CUSTOM_FILE")/$(sed -n 1,2p "$CUSTOM_FILE" | tr '\n' ' ')" "0/base=recommended format=3 "
+printf 'base=recommended\n%s=on\n%s=on\nscreenshots=off\ndebugger=off\nvoice=off\n' "$_in" "$_out" > "$CUSTOM_FILE"
+custom_migrate
+check "custom: an old file keeps only real changes, without the offs pinned on untested options" eq "$(grep -v '^base=\|^format=' "$CUSTOM_FILE" | sort | tr '\n' ' ')" "$(printf '%s\n' "$_out=on" $( case " $(pv recommended) " in *" voice "*) echo voice=off ;; esac) | sort | tr '\n' ' ')"
+cp "$CUSTOM_FILE" "$F/custom.keep"; custom_migrate
+check "custom: a migrated file is left as it is" cmp -s "$CUSTOM_FILE" "$F/custom.keep"
+# 1.5.7: DIAL left the phone option, so a format 2 file with phone on keeps it
+printf 'base=recommended\nformat=2\nphone=on\n' > "$CUSTOM_FILE"; custom_migrate
+check "custom: phone on before 1.5.7 keeps DIAL blocked" eq "$(selected_options | grep -x 'phone\|dial' | tr '\n' ' ')/$(sed -n 's/^format=//p' "$CUSTOM_FILE")" "phone dial /3"
+printf 'base=recommended\nformat=2\nphone=on\ndial=off\n' > "$CUSTOM_FILE"; custom_migrate
+check "custom: a DIAL choice already made stands" eq "$(selected_options | grep -x 'phone\|dial' | tr '\n' ' ')" "phone "
+printf 'base=strict\nformat=2\nphone=off\n' > "$CUSTOM_FILE"; custom_migrate
+check "custom: phone off before 1.5.7 keeps DIAL open" eq "$(selected_options | grep -x 'phone\|dial' | tr '\n' ' ')/$(grep -c '^dial=off' "$CUSTOM_FILE")" "/1"
+printf 'base=strict\nformat=2\nvoice=off\n' > "$CUSTOM_FILE"; custom_migrate
+check "custom: a base with DIAL in it needs no line" eq "$(grep -c '^dial=' "$CUSTOM_FILE")/$(selected_options | grep -cx dial)" "0/1"
+rm -f "${CUSTOM_FILE:?}" "${F:?}/custom.keep"
+
+# awk on old BusyBox: `o = o (...)` reads as a call to a function o there
+check "settings: the JSON is built without a function-call lookalike" eval '! grep -n "o = o (" "$REPO/toolkit/lib/options.sh" "$REPO/toolkit/lib/settings.sh"'
+check "settings: two keys make one object" eq "$(printf 'general|a|1\ngeneral|b|"x"\n' | awk -F'|' -v c=general '$1 == c { v = substr($0, length($1) + length($2) + 3); o = o sep "\"" $2 "\":" v; sep = "," } END { print "{" o "}" }')" '{"a":1,"b":"x"}'
 
 check "bundle: one file parses" eval '"$REPO/tools/bundle.sh" > "$TDIR/oyg.sh" && "$BB" sh -n "$TDIR/oyg.sh"'
 

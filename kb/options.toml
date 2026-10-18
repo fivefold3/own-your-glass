@@ -152,10 +152,21 @@ category = "screen"
 name = "Screen-capture shield"
 what = "Hides the screen captures the OLED service keeps."
 breaks = ""
-detail = "Also blocks a vendor video-plane grabber."
+detail = "OLED care keeps working: the panel service still gets its captures, and status checks that it does. Also blocks a vendor video-plane grabber."
 presets = ["recommended", "strict", "lockdown"]
 since = "1.4"
 hook = "capture"
+
+[[option]]
+id = "screenshots"
+category = "screen"
+name = "Screenshot shield"
+what = "Keeps the TV's other screenshots away from apps and phones."
+breaks = "Screenshots from phone remote apps"
+detail = "Hides Home's Recents pictures, and the LG account folder they are filed under, from apps; stops paired phone apps asking for a screenshot (a phone connected since start-up keeps it until a restart). Verified on the C5: Recents keeps its pictures, and a paired phone app still connects and controls the TV."
+presets = ["recommended", "strict", "lockdown"]
+hook = "screenshots"
+since = "1.6.0"
 
 # ----------------------------------------------------------- casting --
 [[option]]
@@ -183,11 +194,22 @@ id = "phone"
 category = "casting"
 name = "Phone apps and second screen"
 what = "Stops phones controlling the TV over the network."
-breaks = "Phone remote apps, launching apps from a phone, LG Link"
-detail = "Turned off again, phone remote apps need a TV restart (LG's phone server starts only with the TV); the app offers one."
+breaks = "Phone remote apps, LG Link"
+detail = "Turned off again, phone remote apps need a TV restart (LG's phone server starts only with the TV); the app offers one. Phone apps starting apps on the TV is the separate DIAL option."
 presets = ["strict", "lockdown"]
 hook = "phone"
 since = "1.4"
+
+[[option]]
+id = "dial"
+category = "casting"
+name = "Phone apps starting TV apps (DIAL)"
+what = "Stops phone apps finding the TV and starting apps on it."
+breaks = "Casting from a phone app (Spotify, YouTube and others) when its app is not already open on the TV: open it on the TV first"
+detail = "DIAL lets any device on your network start apps on the TV and turn it off, without asking. Its ports are closed by a firewall rule as well, so the block holds even when DIAL loaded before Own Your Glass at start-up. A computer on the LAN firewall's allow list (oyg lan allow <ip>) still gets through."
+presets = ["strict", "lockdown"]
+hook = "dial"
+since = "1.6.0"
 
 [[option]]
 id = "miracast"
@@ -220,6 +242,17 @@ detail = "Replies to connections the TV makes itself (streaming, browsing) still
 presets = ["strict", "lockdown"]
 hook = "lan"
 since = "1.4"
+
+[[option]]
+id = "printing"
+category = "casting"
+name = "Network printing port"
+what = "Closes the TV's print server (port 515), which takes print jobs from anyone on your network."
+breaks = ""
+detail = "Nothing on the TV prints through it. Closed on IPv4 and IPv6 alike."
+presets = ["recommended", "strict", "lockdown"]
+hook = "printing"
+since = "1.6.0"
 
 # ------------------------------------------------------------- cloud --
 [[option]]
@@ -320,6 +353,17 @@ detail = "Also keeps Homebrew Channel's telnet root shell off and fixes world-wr
 presets = ["recommended", "strict", "lockdown"]
 since = "1.4"
 hook = "remote"
+
+[[option]]
+id = "debugger"
+category = "access"
+name = "Web-app debugger"
+what = "Closes the web-app debugger (port 9998) to your network."
+breaks = "Opening a web app's DevTools directly from a computer (ares-inspect and ssh -L 9998:localhost:9998 still work)"
+detail = "The TV always runs it, with no password. Verified on the C5: computers on the network are refused, and it stays reachable from the TV itself. A computer on the LAN firewall's allow list (oyg lan allow <ip>) still gets through."
+presets = ["recommended", "strict", "lockdown"]
+hook = "debugger"
+since = "1.6.0"
 
 [[option]]
 id = "account"

@@ -183,12 +183,12 @@ comm|appcasting|phone
 unit|appcasting.service|phone
 ls2|com.webos.service.appcasting|phone
 id|appcasting|phone
-bin|/usr/palm/services/com.webos.service.dial/discovery-server.js|phone
-ls2|com.webos.service.dial|phone
-id|dial-discovery|phone
 ls2|com.webos.service.lglink|phone
 id|lglink|phone
 set|network.allowMobileDeviceAccess|phone
+bin|/usr/palm/services/com.webos.service.dial/discovery-server.js|dial
+ls2|com.webos.service.dial|dial
+id|dial-discovery|dial
 comm|avahi-daemon|miracast
 unit|avahi-daemon.service|miracast
 id|avahi-daemon|miracast
@@ -201,6 +201,10 @@ comm|miracast|miracast
 unit|miracast.service|miracast
 ls2|com.webos.service.miracast|miracast
 id|miracast|miracast
+bin|/usr/libexec/cups/daemon/cups-lpd|printing
+comm|cups-lpd|printing
+unit|cups-lpd.socket|printing
+id|lpd|printing
 bin|/usr/palm/services/com.webos.service.iotclient/iot-client|thinq
 unit|iot-client.service|thinq
 ls2|com.webos.service.iotclient|thinq

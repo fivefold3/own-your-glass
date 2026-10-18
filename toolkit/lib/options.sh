@@ -37,6 +37,39 @@ current_preset() {
     if is_preset "$_p" || [ "$_p" = custom ]; then printf '%s' "$_p"; else printf recommended; fi
 }
 custom_base() { _b=$(sed -n 's/^base=//p' "$CUSTOM_FILE" 2>/dev/null | head -1); is_preset "$_b" && printf '%s' "$_b" || printf recommended; }
+# The Custom file holds only the options that differ from its base preset
+# (format=2 on), whoever writes it (the app's saveCustom, oyg set), so an
+# option a later version adds to the preset, or one verified since, reaches it.
+custom_write() {  # custom_write <base>, option=on|off lines on stdin
+    _cwm=" $(pv "$1") "
+    { printf 'base=%s\nformat=%s\n' "$1" "$CUSTOM_FORMAT"
+      while IFS='=' read -r _cwk _cwv; do
+          is_option "$_cwk" || continue
+          case $_cwm in *" $_cwk "*) _cwb=on ;; *) _cwb=off ;; esac
+          [ "$_cwv" = "$_cwb" ] || printf '%s=%s\n' "$_cwk" "$_cwv"
+      done; } > "$CUSTOM_FILE.t" && mv "$CUSTOM_FILE.t" "$CUSTOM_FILE"
+}
+CUSTOM_FORMAT=3
+# An older file is rewritten once. Saves before 1.5.5 (unmarked) wrote every
+# option, pinning the base preset's state of the day: lines that match the
+# base go, and so do the offs those saves wrote for options that were still
+# untested and in no preset (debugger in 1.5.1, screenshots up to 1.5.3),
+# which no owner chose. Before 1.5.7 (format 2 and older) the phone option
+# also blocked DIAL: a selection with phone on keeps DIAL blocked, one with
+# phone off (on a base that has DIAL) keeps it open.
+custom_migrate() {
+    [ "$OYG_DRYRUN" != 1 ] && [ -f "$CUSTOM_FILE" ] || return 0
+    _cmf=$(sed -n 's/^format=//p' "$CUSTOM_FILE" | head -1)
+    [ "${_cmf:-1}" -ge "$CUSTOM_FORMAT" ] 2>/dev/null && return 0
+    { if [ -n "$_cmf" ]; then grep -vE '^(base|format)=' "$CUSTOM_FILE"
+      else grep -vE '^(base|format)=|^(debugger|screenshots)=off$' "$CUSTOM_FILE"; fi
+      if ! grep -q '^dial=' "$CUSTOM_FILE"; then
+          grep -qx 'phone=on' "$CUSTOM_FILE" && echo dial=on
+          grep -qx 'phone=off' "$CUSTOM_FILE" && echo dial=off
+      fi
+    } | custom_write "$(custom_base)" \
+        && log "  Custom selection kept as its changes from the $(custom_base) preset"
+}
 # the options on now, in catalogue order. Custom holds explicit choices over
 # a base preset, so an option a later version adds follows that preset.
 selected_options() {
@@ -69,19 +102,21 @@ orphan_scopes() {
 }
 
 # ------------------------------------------------------------ one option --
-opt_settings_apply() {  # leaves OPT_SETTINGS_CHANGED: the keys it changed, for the hook
-    OPT_SETTINGS_CHANGED=""
+opt_settings_apply() {
     _l=$(oc "$1" settings | grep '|')
     [ -n "$_l" ] || return 0
     for _c in $(printf '%s\n' "$_l" | cut -d'|' -f1 | sort -u); do
-        _j=$(printf '%s\n' "$_l" | awk -F'|' -v c="$_c" '$1 == c { v = substr($0, length($1) + length($2) + 3); o = o (o == "" ? "" : ",") "\"" $2 "\":" v } END { print "{" o "}" }')
+        _j=$(printf '%s\n' "$_l" | awk -F'|' -v c="$_c" '$1 == c { v = substr($0, length($1) + length($2) + 3); o = o sep "\"" $2 "\":" v; sep = "," } END { print "{" o "}" }')
         SETTINGS_PAIRS=$(printf '%s\n' "$_l" | awk -F'|' -v c="$_c" '$1 == c { print substr($0, length($1) + 2) }')   # key|value, for the no-python path
         settings_apply "$_c" "$_j"
-        OPT_SETTINGS_CHANGED="$OPT_SETTINGS_CHANGED $SETTINGS_CHANGED"
     done
 }
-opt_settings_restore() {
-    for _c in $(sed -n 's/^settings\.\([^=]*\)=.*/\1/p' "$OYG_STATE/kv.$1" 2>/dev/null); do settings_restore "$_c"; done
+opt_settings_restore() {  # leaves SETTINGS_KEPT: category=record lines settingsservice refused
+    SETTINGS_KEPT=""
+    for _c in $(sed -n 's/^settings\.\([^=]*\)=.*/\1/p' "$OYG_STATE/kv.$1" 2>/dev/null); do
+        settings_restore "$_c" || SETTINGS_KEPT="$SETTINGS_KEPT
+$_c=$(kv_get "settings.$_c")"
+    done
 }
 opt_apply() {
     OYG_MOD=$1; oyg_init_dirs
@@ -109,15 +144,20 @@ opt_apply() {
 # From the records alone: a scope no longer in the catalogue (an option a
 # newer version renamed or dropped, a 1.4 module) is restored the same way.
 opt_restore() {
-    OYG_MOD=$1
+    OYG_MOD=$1; _h=""
     if is_option "$1"; then
         head_ "$(ov "$1" name): restoring"
         _h=$(ov "$1" hook); [ -n "$_h" ] && "hook_${_h}_restore"
         _s=$(oc "$1" spec)
     else head_ "$1: restoring (left by an earlier version)"; _s=""; fi
     opt_settings_restore "$1"
+    # a hook that must know how the settings came back (hook_<name>_restored)
+    [ -n "$_h" ] && command -v "hook_${_h}_restored" >/dev/null 2>&1 && "hook_${_h}_restored"
     eula_restore
     printf '%s\n' "$_s" | svc_restore
+    # settings settingsservice refused stay recorded (generic restore dropped
+    # the kv file): the next restore tries them again, and status says so
+    printf '%s\n' "$SETTINGS_KEPT" | while IFS= read -r _kl; do [ -n "$_kl" ] && kv_set "settings.${_kl%%=*}" "${_kl#*=}"; done
     OYG_MOD=core
 }
 

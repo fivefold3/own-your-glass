@@ -4,7 +4,9 @@
 # remote API (SSAP, 3000/3001: screenshots, input, power once paired), DIAL
 # (36866/18181: unauthenticated app launch and power-off), LG Link (webOS 11,
 # 50051/50052: insecure gRPC), AirPlay and HomeKit, the Chromecast receiver,
-# unauthenticated printing (LPD, 515) and the web-app debugger (9998).
+# unauthenticated printing (LPD, 515) and the web-app debugger (9998). The
+# last two have options of their own in every preset (printing, debugger),
+# and DIAL's ports are closed by the DIAL option as well.
 #
 # One chain, OYG_LAN, jumped to first from INPUT. The kernels of webOS 10
 # and 11 track connections but have no iptables match for it (no
@@ -24,17 +26,42 @@
 # Netfilter on these kernels is IPv4 only (webOS 10 and 11), so IPv6 is
 # switched off on eth0 and wlan0 while the option is on (recorded, and put
 # back on restore); webOS 11 also turns on router advertisements at every
-# boot (accept_ra 2). Printing (cups-lpd.socket) and, on webOS 10 and older,
-# rdisc (any LAN host can inject a default route) and ninfod are stopped.
+# boot (accept_ra 2). On webOS 10 and older, rdisc (any LAN host can inject
+# a default route) and ninfod are stopped. The printing port (LPD, 515) is
+# the printing option's, in every preset.
 
 LAN_CHAIN=OYG_LAN
 LAN_KEEP_TCP=""                    # nothing, SSH included (the owner's call); oyg lan allow lets a device through
 LAN_UDP_EXTRA="56700"              # LIFX (Universal Control's scanner), a fixed port in the high range
-LAN_ALLOW="$OYG_ROOT/lan-allow"
-LAN_UNITS="cups-lpd.socket rdisc.service ninfod.service"
-LAN_IFACES="eth0 wlan0"
+LAN_UNITS="rdisc.service ninfod.service"
 
-ipt() { iptables -w "$@" 2>/dev/null || iptables "$@" 2>/dev/null; }
+# Up to 1.5.1 this option stopped the printing socket. Its record moves to
+# the printing option that owns it now, so undoing the LAN firewall cannot
+# start the port again behind the printing option's back.
+lan_handover_lpd() {
+    state_has units cups-lpd.socket || return 0
+    [ "$OYG_DRYRUN" = 1 ] && return 0
+    state_del units cups-lpd.socket
+    _lho=$OYG_MOD; OYG_MOD=printing; state_add units cups-lpd.socket; OYG_MOD=$_lho
+}
+
+lan_rules() {  # lan_rules <chain>
+    ipt -A "$1" -i lo -j RETURN || return 1
+    for _p in $LAN_KEEP_TCP; do ipt -A "$1" -p tcp --dport "$_p" -j RETURN || return 1; done
+    if [ -f "$LAN_ALLOW" ]; then
+        for _a in $(grep -v '^#' "$LAN_ALLOW"); do ipt -A "$1" -s "$_a" -j RETURN || return 1; done
+    fi
+    { ipt -A "$1" -p tcp --syn -j REJECT --reject-with tcp-reset || ipt -A "$1" -p tcp --syn -j DROP; } || return 1
+    ipt -A "$1" -p udp --sport 67 --dport 68 -j RETURN || return 1
+    ipt -A "$1" -p udp --dport "1:$(( $(lan_ephemeral) - 1 ))" -j DROP || return 1
+    for _p in $LAN_UDP_EXTRA; do ipt -A "$1" -p udp --dport "$_p" -j DROP || return 1; done
+    ipt -A "$1" -p icmp --icmp-type echo-request -j DROP
+}
+# the chain is in place and refuses new TCP connections
+lan_closed() {
+    ipt -C INPUT -j "$LAN_CHAIN" || return 1
+    ipt -C "$LAN_CHAIN" -p tcp --syn -j REJECT --reject-with tcp-reset || ipt -C "$LAN_CHAIN" -p tcp --syn -j DROP
+}
 # the first port of the kernel's range for outgoing traffic (32768 by default)
 lan_ephemeral() { _r=$(cut -f1 /proc/sys/net/ipv4/ip_local_port_range 2>/dev/null | tr -d ' '); printf '%s' "${_r:-32768}"; }
 
@@ -51,28 +78,23 @@ do_lan() {
             { grep -vxF "$2" "$LAN_ALLOW" 2>/dev/null; [ "$1" = allow ] && printf '%s\n' "$2"; } > "$LAN_ALLOW.t"; mv "$LAN_ALLOW.t" "$LAN_ALLOW"
             # the address stays out of the log (it is on flash): the count is enough
             [ "$1" = allow ] && ok "one more device may connect to the TV ($(grep -c . "$LAN_ALLOW") allowed)" || ok "a device left the allow list ($(grep -c . "$LAN_ALLOW") allowed)"
-            if selected_options | grep -qx lan; then OYG_MOD=lan; hook_lan_apply; OYG_MOD=core; fi ;;
+            _sel=$(selected_options)
+            for _lo in lan debugger dial; do
+                printf '%s\n' "$_sel" | grep -qx "$_lo" && { OYG_MOD=$_lo; "hook_${_lo}_apply"; OYG_MOD=core; }
+            done ;;
         *) die "usage: oyg lan allow|deny <ip or cidr> | oyg lan list" ;;
     esac
 }
 
 hook_lan_apply() {
+    lan_handover_lpd
     command -v iptables >/dev/null 2>&1 || { info "no iptables on this TV: LAN firewall not available"; return 0; }
     if [ "$OYG_DRYRUN" = 1 ]; then info "(dry-run) close the TV to incoming connections"; return 0; fi
-    # build the chain completely before the jump goes in: the SSH session
-    # running this keeps working throughout
-    ipt -N "$LAN_CHAIN" || ipt -F "$LAN_CHAIN"
-    state_add chains "$LAN_CHAIN"
-    ipt -A "$LAN_CHAIN" -i lo -j RETURN
-    for _p in $LAN_KEEP_TCP; do ipt -A "$LAN_CHAIN" -p tcp --dport "$_p" -j RETURN; done
-    [ -f "$LAN_ALLOW" ] && grep -v '^#' "$LAN_ALLOW" | while read -r _a; do [ -n "$_a" ] && ipt -A "$LAN_CHAIN" -s "$_a" -j RETURN; done
-    ipt -A "$LAN_CHAIN" -p tcp --syn -j REJECT --reject-with tcp-reset || ipt -A "$LAN_CHAIN" -p tcp --syn -j DROP
-    ipt -A "$LAN_CHAIN" -p udp --sport 67 --dport 68 -j RETURN
-    ipt -A "$LAN_CHAIN" -p udp --dport "1:$(( $(lan_ephemeral) - 1 ))" -j DROP
-    for _p in $LAN_UDP_EXTRA; do ipt -A "$LAN_CHAIN" -p udp --dport "$_p" -j DROP; done
-    ipt -A "$LAN_CHAIN" -p icmp --icmp-type echo-request -j DROP
-    ipt -C INPUT -j "$LAN_CHAIN" || ipt -I INPUT 1 -j "$LAN_CHAIN"
-    ok "the TV is closed to incoming connections$( [ -s "$LAN_ALLOW" ] && echo " (allowed devices excepted)")"
+    # the chain is built complete before the jump moves to it (ipt_chain): the
+    # SSH session running this keeps working, and no port opens in between
+    if ipt_chain "$LAN_CHAIN" lan_rules && lan_closed; then
+        ok "the TV is closed to incoming connections$( [ -s "$LAN_ALLOW" ] && echo " (allowed devices excepted)")"
+    else warn "could not close the TV to incoming connections (iptables refused a rule)"; fi
     for _u in $LAN_UNITS; do have_unit "$_u" && stop_unit "$_u"; done
     # IPv6 is not filtered: switch it off, and stop taking router advertisements
     for _i in $LAN_IFACES; do
@@ -97,7 +119,7 @@ hook_lan_restore() {
 }   # the chain and the units are recorded: generic restore
 hook_lan_status() {
     command -v iptables >/dev/null 2>&1 || { st "$1" NA "no iptables on this TV"; return 0; }
-    if ! ipt -C INPUT -j "$LAN_CHAIN"; then st "$1" WARN "LAN firewall not in place"; return 1; fi
+    if ! lan_closed; then st "$1" WARN "LAN firewall not in place"; return 1; fi
     st "$1" OK "closed to incoming connections"
     _v6=""; for _i in $LAN_IFACES; do [ "$(cat "/proc/sys/net/ipv6/conf/$_i/disable_ipv6" 2>/dev/null)" = 0 ] && _v6="$_v6 $_i"; done
     [ -z "$_v6" ] || { st "$1" WARN "IPv6 is on for$_v6, which the firewall cannot cover (apply again)"; return 1; }

@@ -136,6 +136,73 @@ options:
   devices to UEI's cloud (`www.ueiwsp.com`) and asks Philips Hue's discovery
   service; those hostnames are a separate, safe option.
 
+**Screen**
+
+- `eplmanager` (OLED pixel care) asks `captureservice` for a 640×360 grab of
+  the UI plane every ~3 s, into `/tmp/capture.rgb`, world-readable in the
+  `/tmp` every app sandbox shares. It uses the grabs to dim static on-screen
+  elements, so OYG shields the file rather than stopping the service: both
+  run as root and `captureservice` writes in place (`fopen`/`fwrite`, no
+  rename), so a root-only file bound over the path keeps the panel fed. On
+  the C5 with the shield on (2026-10-17), a bus trace showed `eplmanager` as
+  the capture service's only caller, every ~3.3 s, each grab returning
+  691,200 bytes written into the shielded file.
+- The root-only files the shield binds live in `/run/own-your-glass` (since
+  1.5.6; before, a fixed folder in `/tmp`). On webOS `/run` is root's own
+  tmpfs, which no app jail can write (the `/var/run` some jails mount is
+  `/tmp/var/run`). `/tmp` is shared with every sandbox, so the shield trusts
+  nothing it finds there: a link, or anything but a plain file, at a
+  shielded path is left alone and reported.
+- `eplmanager` samples the screen only from webOS 10 on: the CX (5.6), C1
+  (6.5) and a C3 on webOS 8.3 have no screen-grab code in it. Images shared
+  by OLED and LCD sets (QNED86 2024 and 2025, NANO86 2021) ship it, but LG's
+  launcher starts it on OLED panels only. Status reports on OLED care only
+  where it samples.
+- `surface-manager` saves a JPEG of the app on screen at app switches (and
+  again a little later) for Home's Recents, in `/tmp/snapshots/<account>/`
+  (`default` with no LG account), with a backup path on flash,
+  `/mnt/lg/cmn_data/snapshots` (not present on the C5). Up to webOS 10 the
+  compositor plugin makes each account folder 0660 itself, so the pictures
+  are already out of the sandboxes' reach there, but `/tmp/snapshots` is
+  0755: any app can list the account folders. webOS 11's compositor sets no
+  mode that can be seen. The compositor and Home run as root on every
+  surveyed image, so the folders above can be root-only.
+- The capture API (`capture/executeOneShot`) is in LS2's `private` group,
+  which about 400 of LG's own clients hold; third-party apps do not. Its
+  callers are pixel care, the picture wizard, the compositor, the voice stack
+  (`performer`, `voiceclick`), `remotediag`, `scd-service` (channel-banner
+  OCR), the broadcast stacks and the phone API. OYG stops the callers that
+  collect, not the API, which pixel care needs.
+- A paired phone app can take a screenshot three ways:
+  `capture/executeOneShot`, `apiadapter/tv/executeOneShot` (a 960×540 JPEG in
+  `/tmp/capture.jpg`) and the virtual `tv/executeOneShot`. The three are the
+  same on every surveyed image. The gateway builds its method table from its
+  interface files at the first phone request after it starts, and answers a
+  request without a client key with 401 for a method it has and 404 for one
+  it does not, which tells the two apart without pairing.
+- A sweep of the C5's writable storage with the shields on found no other
+  screen image an app can read: what is left is channel logos and UI assets.
+- The Screenshot shield on the C5 (2026-10-17, 1.5.3): with the
+  interface copies bound before the first phone request after a restart,
+  all three screenshot calls answer 404 while the phone API's other methods
+  answer 401 to a client without a key; the owner's phone app then found,
+  paired with and controlled the TV (volume, navigation), and Home's Recents
+  kept its pictures.
+- `eplmanager` stops grabbing the screen while
+  `/mnt/lg/cmn_data/pnwash/osdCaptureDisable` exists (the switch of its test
+  menu), giving up its dimming of static on-screen elements. OYG leaves it
+  alone so that pixel care keeps working. Its pixel-care logs go to rdxd's
+  spool (`/var/spool/rdxd/pnwashLog.*`), which the diagnostics option stops
+  and purges.
+- Pixel care keeps its schedule under OYG. LG keeps its state in
+  `/mnt/lg/cmn_data/pnwash/`, against the panel time `panelcontroller`
+  reports in 10-minute units. On the C5 at 542 panel hours: the short
+  compensation after switch-off every 4 hours of use (91 done, the last at
+  538 h), the long Pixel Refresher every 2000 hours (last at 501 h), no
+  failure alerts, and the static-image stress count still rising.
+- `takeOnAllowed` in the consent flags is "Who.Where.What?", recognition of
+  people, places and products on screen; `sam` and Home read it.
+
 ## 2. LG's gateway
 
 Most of the TV reaches LG through one daemon, `sdx`. A caller names a
@@ -184,7 +251,11 @@ server-pushed one.
   `sportsalert` and (webOS 11) `familycare` and LG Link. Nothing can unload
   one without killing the others, so a service loaded before the boot hook
   stays until the next restart; status reports it as resident rather than
-  blocked.
+  blocked. Its built-in `quit` does not help: under the shared server it only
+  marks the service idle (`enterIdle`), and the server keeps the module
+  loaded, as LG's own comment explains, because unloading one with
+  callbacks still pending breaks it. DIAL's ports are firewalled for that
+  reason (1.5.7).
 - **Consents** are held by the settings service, with an md5 sidecar the
   boot checks. Editing the cache file directly (as earlier work did) left
   the sidecar stale, matched only a dead 2014 list, and never touched the
@@ -264,6 +335,22 @@ first versions, that turned out wrong on the reference TV:
 - LG's phone-remote server never starts again in the same boot after
   `allowMobileDeviceAccess` is turned off and on (an LG bug), and Miracast
   connects again only after a restart: hence the "Restart required" notice.
+  The phone server does not start either when the setting is turned on in
+  a boot that began with it off: up to 1.5.2 OYG asked for a restart only
+  when it had turned the setting off in that same boot, so undoing the Phone
+  apps option after a restart left phones unable to find the TV, with no
+  notice (found with a phone app on the C5, 2026-10-17; fixed in 1.5.3).
+- BusyBox 1.29 to 1.31 (the CX 2020, the C1 and NANO86 2021, a C3 on webOS
+  8.3) read `o = o (o == "" ? ...)` in awk as a call to an undefined
+  function `o`: up to 1.5.5 every system setting OYG writes failed to build
+  there. 1.5.6 writes the separator from a variable instead.
+- sam's `blockSystemApp` and `releaseBlockSystemApp` (webOS 10 and 11, in
+  no permission group, so root only) hide and show an app at once, with no
+  restart, and write the hidden-app file themselves. They take only apps
+  still running from the rootfs: LG Channels, registered from its updated
+  copy in `/media/system/apps`, is refused as "not system app", and a
+  release answers `true` for an app that was never blocked. The hidden-app
+  file stays the lever, and the restart notice when an app comes back stays.
 - A stored LG account signs itself in at every boot, and the account terms
   prompt that follows cannot be satisfied locally. There is no "keep the
   account but do not sign in" switch; removing the account is the only
@@ -276,9 +363,37 @@ remote API on 3000/3001 (after one accepted pairing prompt: screenshots,
 input injection, power; unpaired clients still get the device UUID and can
 wake the screen), DIAL on 36866/18181 (unauthenticated app launch and
 power-off), the Chromecast receiver, LPD printing on 515, the web-app
-debugger on 9998, and `rdisc`, which lets any LAN host inject a default
-route. `iptables` works on these kernels (IPv4 only; there is no IPv6
-netfilter, so the LAN firewall option turns IPv6 off while it is on).
+debugger on 9998 (WebAppMgr always starts it on 0.0.0.0, Developer Mode or
+not, with no password: on the C5 it handed a computer on the LAN the
+browser-level DevTools socket and one for the open web app), and `rdisc`,
+which lets any LAN host inject a default route. `iptables` works on these
+kernels (IPv4 only; there is no IPv6 netfilter, so the LAN firewall option
+turns IPv6 off while it is on).
+
+What a C5 on a Recommended-based selection still answers on the LAN
+(2026-10-17, sockets mapped to processes through `/proc`): SSH (Homebrew
+Channel), AirPlay and the Cast receiver (the owner keeps both), a sideloaded
+media server with no login, upnpd's device descriptions, xinetd for the phone
+API and DIAL (which the Phone apps and DIAL options leave with nothing behind them),
+and LPD printing on 515. Since 1.5.2 the web-app debugger and the printing
+port are closed in every preset, not only by the LAN firewall: the
+debugger by a firewall chain (it keeps answering on the TV itself), the
+printing port by stopping its systemd socket, so nothing listens on 515 on
+IPv4 or IPv6.
+
+DIAL is how phone apps reach a TV app that is not open. A C5 answers SSDP
+for `urn:dial-multiscreen-org:service:dial:1` through upnpd (registered by
+`dial.ssdpmanager`, which then exits); the apps themselves are served on
+36866 by `com.webos.service.dial`. Spotify's TV app registers there as
+`com.spotify.Spotify.TVv2` (its `dialAppName`), so with DIAL blocked a phone
+can cast to Spotify only once the app is open on the TV and signed in,
+which is what owners notice. Until 1.5.7 the Phone apps option carried DIAL,
+and how it behaved changed from boot to boot. In a boot where DIAL loaded
+before the boot hook, it stayed resident and kept answering; otherwise it
+was gone. DIAL is its own option from 1.5.7, which also closes 36866 and
+18181 with a firewall chain, so a copy that loaded first is cut off from the
+network too. The xinetd sockets are dual-stack and netfilter is IPv4 only,
+which matters only where IPv6 is on (it was off on the C5's Wi-Fi).
 
 Two local findings are worth knowing about even without OYG. Homebrew
 Channel's service tree and the directories above every homebrew app ship
@@ -300,6 +415,10 @@ it.
 - OYG on webOS 11, on the 5.6 to 9.2 generations, on 8K sets and on
   StanbyME: surveyed, not run.
 - HbbTV options: not testable on the reference TV (no broadcast reception).
+- Telling restarts apart by `/proc/stat`'s `btime` holds on the C5, where
+  every power-on is a snapshot resume with a new `btime`. A model that
+  suspends to RAM in standby can move `btime` without a restart (seen on
+  webOS 4 elsewhere), so restart notices could clear too early there.
 - Closing the boot window from inside the TV (an earlier bind step or unit
   drop-ins; LG itself uses `ExecCondition=` on webOS 11) is planned but not
   built.

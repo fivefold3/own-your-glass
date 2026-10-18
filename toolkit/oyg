@@ -104,7 +104,7 @@ do_preset() {
 # change the Custom selection. It starts from the current selection (its base
 # preset, and explicit choices when Custom is current); base= replaces that.
 do_set() {
-    need_root; ensure_installed
+    need_root; ensure_installed; custom_migrate
     _cur=$(current_preset); _base=$_cur; [ "$_cur" = custom ] && _base=$(custom_base)
     _t=$(oyg_tmp custom)
     if [ "$_cur" = custom ]; then grep -v '^base=' "$CUSTOM_FILE" 2>/dev/null > "$_t"; else : > "$_t"; fi
@@ -115,8 +115,8 @@ do_set() {
         case $v in on|off) ;; *) die "use $k=on or $k=off" ;; esac
         { grep -v "^$k=" "$_t"; printf '%s=%s\n' "$k" "$v"; } > "$_t.n" && mv "$_t.n" "$_t"
     done
-    if [ "$OYG_DRYRUN" = 1 ]; then info "(dry-run) Custom: base $_base, $(tr '\n' ' ' < "$_t")"; return 0; fi
-    { printf 'base=%s\n' "$_base"; cat "$_t"; } > "$CUSTOM_FILE"
+    if [ "$OYG_DRYRUN" = 1 ]; then info "(dry-run) Custom: base $_base, $(grep -v '^format=' "$_t" | tr '\n' ' ')"; return 0; fi
+    custom_write "$_base" < "$_t"   # only what differs from the base is kept
     printf 'custom\n' > "$PRESET_FILE"
     do_apply
 }
@@ -219,7 +219,10 @@ do_boot() {
     if ! app_installed; then
         head_ "app is gone: restoring the TV and removing myself"
         forget_first_use; do_restore; forget_traces
-        [ "$OYG_DRYRUN" = 1 ] || { rm -f "$OYG_HOOK"; rm -rf "$OYG_ROOT"; }
+        _rr=$(restart_list)   # goes with $OYG_ROOT: said now or never
+        [ "$OYG_DRYRUN" = 1 ] || { rm -f "$OYG_HOOK"; rm -rf "$OYG_ROOT" "$CAP_DIR"; }
+        [ -z "$_rr" ] || ( oyg_detach_env toast; wait_boot_done; sleep 3
+            toast_always "Own Your Glass removed itself. Restart the TV: $_rr after the restart" ) </dev/null >/dev/null 2>&1 &
         return 0
     fi
     if [ -f "$GIVEN_BACK" ]; then
@@ -332,6 +335,7 @@ do_uninstall2() {
     # off LG's first-use list before service-logger starts again
     forget_first_use; first_use_note
     do_restore
+    _rr=$(restart_list)   # goes with $OYG_ROOT: the last toast says it
     rm -f "$OYG_HOOK"; rm -rf "$OYG_ROOT"
     head_ "own-your-glass removed from $OYG_ROOT"
     if [ "$1" = 1 ]; then
@@ -344,12 +348,16 @@ do_uninstall2() {
     first_use_settle
     forget_traces
     # the app is closed by now: the toast is the only word the owner gets
-    if [ "$1" = 1 ]; then app_installed && toast "Own Your Glass: TV restored; the app is still being removed" || toast "Own Your Glass: TV restored, app removed"; fi
+    if [ "$1" = 1 ]; then
+        if [ -n "$_rr" ]; then toast_always "Own Your Glass: TV restored. Restart the TV: $_rr after the restart"
+        elif app_installed; then toast "Own Your Glass: TV restored; the app is still being removed"
+        else toast "Own Your Glass: TV restored, app removed"; fi
+    fi
     # our files in /tmp: the app's job log gets its exit line after we
     # return, so they go once the job's shell (our parent) is done
     ( oyg_detach_env forget
       _i=0; while [ $_i -lt 30 ] && kill -0 "$PPID" 2>/dev/null; do sleep 1; _i=$((_i+1)); done
-      rm -rf "$OYG_APP_DIR" /tmp/.own-your-glass /tmp/.own-your-glass.* "${2:-/tmp/.oyg-uninstall.none}" /tmp/snapshots/*/"$OYG_APPID"_*
+      rm -rf "$OYG_APP_DIR" /run/own-your-glass /tmp/.own-your-glass /tmp/.own-your-glass.* "${2:-/tmp/.oyg-uninstall.none}" /tmp/snapshots/*/"$OYG_APPID"_*
     ) </dev/null >/dev/null 2>&1 &
 }
 

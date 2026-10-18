@@ -31,7 +31,7 @@ contains comes from the knowledge base (`kb/*.toml`), generated into
 |---|---|
 | `spec` | services to block (`lib/svc.sh`); `released` = ones it used to block |
 | `settings` | system settings set through settingsservice (`lib/settings.sh`) |
-| `hook` | code for what is not declarative (`hooks/<name>.sh`: mic, capture, remote, nag, consents, voice, diagnostics, lan, phone, miracast, account) |
+| `hook` | code for what is not declarative (`hooks/<name>.sh`: mic, capture, screenshots, remote, debugger, nag, consents, voice, diagnostics, lan, printing, phone, dial, miracast, account) |
 | `sdx`, `hosts`, `apps` | contributions to the shared resources |
 
 The **resources** are built from the union of the applied options'
@@ -41,7 +41,9 @@ and the hidden-app list (`resources/apps.sh`).
 
 The owner's selection is a preset or their one Custom set (`$OYG_ROOT/preset`,
 `$OYG_ROOT/custom`: explicit choices over a base preset, so an option a later
-version adds follows that preset). `oyg apply` brings the TV to the
+version adds follows that preset). The app writes only the options that
+differ from the base (since 1.5.5; writing every option froze one that was
+not yet verified at the time as off). `oyg apply` brings the TV to the
 selection: it restores every scope with records that is not selected, applies
 every selected option, then rebuilds the resources. Entries not yet verified
 on a TV are generated into separate lists and left out unless
@@ -132,7 +134,11 @@ JS services loaded into the shared JS server (`run-js-service -u`: DIAL,
 `homeconnect`, `sportsalert`) cannot be unloaded or killed without killing
 the phone remote API and Settings' own services with them. If one loaded
 before the boot hook ran, it stays until the TV restarts; status reports it
-as `RESIDENT`, not as blocked.
+as `RESIDENT`, not as blocked. A resident copy is kept from doing harm another
+way: DIAL, the one that listens on the network, also has its ports closed by
+a firewall chain, which holds whoever answers them; `homeconnect` and
+`sportsalert` are front-ends whose cloud hostnames, gateway routes and
+native back-ends their options already cut.
 
 Binds do not touch the read-only vendor filesystem and disappear on reboot,
 which is why the boot hook exists.
@@ -257,9 +263,18 @@ Some undos only take full effect after a restart, and the app says so
 ("Restart required", with Restart now / Later; `oyg reboot` goes through
 LG's power service):
 
-- **Phone apps.** LG's second-screen gateway stops its server when
-  `allowMobileDeviceAccess` goes off but starts it only once per run; if the
-  setting was turned off in this boot, turning it back on needs a restart.
+- **Phone apps.** LG's second-screen gateway starts its server only once
+  per run, and only while `allowMobileDeviceAccess` is on: whenever the
+  setting comes back on in a boot that had it off (turned off in that boot,
+  or off since the start), phones find the TV again only after a restart.
+  The phone hook decides once the setting is back (`hook_phone_restored`,
+  run by `opt_restore` after the settings): a restore settingsservice
+  refused asks for nothing.
+- **Screenshot shield.** The gateway keeps the method table it built with
+  the shield's copies until it restarts, so phones get the screenshot calls
+  back only after a restart (asked for where phones can reach the TV). The
+  other way round, a gateway that built its table before the shield keeps
+  the calls: status says RESIDENT.
 - **Screen Share.** Miracast started again after an undo is listed but
   cannot connect until the TV restarts.
 - **Hidden apps.** The app manager reads the hidden-app list only when it
@@ -460,10 +475,13 @@ The app parses this; so can a script.
 - Some servers are handed out at runtime and differ by region, so a TV
   elsewhere may reach names the knowledge base has not seen (README,
   "Servers LG picks at runtime").
-- The only packet filter is the opt-in LAN firewall (every inbound
-  connection, SSH included unless a device is on its allow list; IPv4 only:
-  these kernels have no IPv6 netfilter, so IPv6 is switched off while it is
-  on). There is no egress
+- The packet filters are inbound only: the web-app debugger chain (port
+  9998, every preset), the DIAL chain (36866 and 18181, with the DIAL
+  option) and the opt-in LAN firewall (every inbound connection,
+  SSH included unless a device is on its allow list; IPv4 only: these
+  kernels have no IPv6 netfilter, so IPv6 is switched off while it is on).
+  All are built under a new name and swapped in, so a re-apply never opens
+  a port in between. There is no egress
   filter; LG's gateway is handled by its routing table and hostnames by
   `/etc/hosts`.
 - It does not disable firmware updates. Homebrew Channel already has that

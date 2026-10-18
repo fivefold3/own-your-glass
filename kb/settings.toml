@@ -257,21 +257,23 @@ key = "allowMobileDeviceAccess"
 value = 'false'
 option = "phone"
 since = "1.4"
-note = "Closes the phone remote API (verified on the C5: a paired remote app stops at once). Turning it back on does not restart LG's second-screen server within the same boot: the phone hook asks for a restart."
+note = "Closes the phone remote API (verified on the C5: a paired remote app stops at once). Turning it back on does not bring LG's second-screen server back within a boot, whether it went off in that boot or was already off when the TV started (verified with a phone app, 2026-10-17): the phone hook asks for a restart."
 
 # ------------------------------------------------------------ consent --
 # The consent list (eulaInfoNetwork) ids and the eulaStatus permission flags
 # the consents option declines (lib/eula.sh). The basic terms (S_SVC terms
 # of use, S_PRG privacy policy) and generalTermsAllowed, networkAllowed,
 # chpAllowed are never touched: declining them raises the agreements wall on
-# every launch.
+# every launch. takeOnAllowed is "Who.Where.What?", LG's recognition of
+# people, places and products in what is on screen (read by sam and Home;
+# in eulaStatus on every surveyed image, webOS 5.6 to 11.2).
 [eula]
 option = "consents"
 legacy = "consent"
 ids = ["S_VNG", "S_PRV", "S_TAD", "S_TAG", "S_ADG", "S_ADC", "S_ADD", "S_VDC", "S_VDD", "S_NVC", "S_NVD", "S_MKT", "S_DPA", "S_ALL"]
 flags = [
   "acrAllowed", "acrOnAllowed", "acrAdAllowed", "acrGdprAllowed", "shoppingOnAllowed", "veranceOnAllowed",
-  "voiceAllowed", "voice2Allowed", "marketingOnAllowed", "customAdAllowed", "customadsAllowed",
+  "takeOnAllowed", "voiceAllowed", "voice2Allowed", "marketingOnAllowed", "customAdAllowed", "customadsAllowed",
   "thirdPartySharingAllowed", "remoteDiagAllowed", "additionalDataAllowed", "additional1Allowed",
   "additional2Allowed", "additional3Allowed", "additional4Allowed", "additional5Allowed", "cookiesAllowed",
 ]

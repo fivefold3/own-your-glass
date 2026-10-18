@@ -11,7 +11,7 @@ summary = "Blocks tracking and ads; keeps casting, phone apps and the Store work
 [[preset]]
 id = "strict"
 name = "Strict"
-summary = "Also turns off casting, phone control and LG Channels, closes the TV to your network and blocks your LG account."
+summary = "Also turns off casting, phone control and LG Channels, closes the TV to your network and blocks your LG account. Phone apps such as Spotify can cast only to an app already open on the TV."
 
 [[preset]]
 id = "lockdown"

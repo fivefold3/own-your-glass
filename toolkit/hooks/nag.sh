@@ -59,7 +59,7 @@ W
     chmod 755 "$NAG_WATCH"
     nohup setsid sh "$NAG_WATCH" >/dev/null 2>&1 </dev/null &
     printf '%s' "$!" > "$NAG_PID"
-    _t=0; while [ $_t -lt 10 ] && ! nag_watch_running; do sleep 0.1; _t=$((_t+1)); done
+    _t=0; while [ $_t -lt 10 ] && ! nag_watch_running; do nap 0.1; _t=$((_t+1)); done
     nag_watch_running && ok "launchEulaByHome watcher running (pid $(cat "$NAG_PID"))" || warn "watcher did not start"
 }
 nag_watch_stop() {

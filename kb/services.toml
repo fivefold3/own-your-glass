@@ -816,13 +816,13 @@ what = "Turns a phone screen share into an app deeplink; LG can deliver a Python
 
 [[service]]
 id = "dial-discovery"
-option = "phone"
+option = "dial"
 legacy = "cloud"
 since = "1.2"
 binary = "/usr/palm/services/com.webos.service.dial/discovery-server.js"
 ls2 = "com.webos.service.dial"
 flags = ["u", "L=unified"]
-what = "DIAL server (JS, unified server): phone apps launch YouTube or Netflix on the TV; unauthenticated app launch and power-off from the LAN."
+what = "DIAL server (JS, unified server): phone apps find the TV and launch Spotify, YouTube and others on it (Spotify registers as com.spotify.Spotify.TVv2); unauthenticated app launch and power-off from the LAN."
 
 [[service]]
 id = "lglink"
@@ -854,6 +854,17 @@ ls2 = "com.webos.service.lgchannelurl"
 flags = ["L=dynamic"]
 what = "Fills LG Channels' ad-insertion URLs with LGUDID, IFA, zipcode, IP and consent flags (webOS 6 and 11); can download a replacement Python script."
 evidence = ["firmware-survey/results/webos11-c5.md"]
+
+# ============================================================== printing ==
+[[service]]
+id = "lpd"
+option = "printing"
+since = "1.5.2"
+unit = "cups-lpd.socket"
+binary = "/usr/libexec/cups/daemon/cups-lpd"
+comm = "cups-lpd"
+what = "CUPS's LPD print server: systemd listens on port 515 on every address (IPv4 and IPv6) and starts cups-lpd (user lp) for each connection, with no login, to hand the job to the TV's CUPS scheduler. Enabled on every webOS 10 and 11 image surveyed; nothing on the TV prints through it."
+evidence = ["2026-09-25-service-audit/reports/gateway-consent-remote.md"]
 
 # ================================================================= never ==
 # Hard: breaks the TV, risks the panel, or is shared infrastructure. No

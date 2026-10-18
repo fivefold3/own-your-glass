@@ -3,7 +3,7 @@
 
 OYG_KB_GENS='5.6 6.5 8.3 9.2 10.3 11.2'
 OYG_KB_RUN='10.3'
-OYG_OPTIONS='acr ads adid promos lgchannels diagnostics usage-logs consents hbbtv-tracking hbbtv voice mic voice-core capture airplay cast phone miracast uei-cloud lan thinq google-home buddy-sports ai backup-presence universal-control trackers store-traffic remote-config remote-support account terms'
+OYG_OPTIONS='acr ads adid promos lgchannels diagnostics usage-logs consents hbbtv-tracking hbbtv voice mic voice-core capture screenshots airplay cast phone dial miracast uei-cloud lan printing thinq google-home buddy-sports ai backup-presence universal-control trackers store-traffic remote-config remote-support debugger account terms'
 OYG_CATEGORIES='ads usage voice screen casting cloud network access'
 CAT_ads_title='Ads and content recognition'; CAT_ads_blurb='Ads and what watches the screen.'
 CAT_usage_title='Usage data and diagnostics'; CAT_usage_blurb='Logs, crash reports and consents.'
@@ -14,11 +14,11 @@ CAT_cloud_title='LG cloud and smart home'; CAT_cloud_blurb='LG'\''s cloud, smart
 CAT_network_title='Network'; CAT_network_blurb='Hostnames sent nowhere.'
 CAT_access_title='Remote access and prompts'; CAT_access_blurb='Remote access, accounts and prompts.'
 
-PRESET_recommended='acr ads adid promos diagnostics usage-logs consents hbbtv-tracking voice mic capture thinq google-home buddy-sports backup-presence trackers remote-support terms'
+PRESET_recommended='acr ads adid promos diagnostics usage-logs consents hbbtv-tracking voice mic capture screenshots printing thinq google-home buddy-sports backup-presence trackers remote-support debugger terms'
 PRESET_recommended_name='Recommended'; PRESET_recommended_summary='Blocks tracking and ads; keeps casting, phone apps and the Store working.'; PRESET_recommended_warning=''
-PRESET_strict='acr ads adid promos lgchannels diagnostics usage-logs consents hbbtv-tracking voice mic capture airplay cast phone miracast uei-cloud lan thinq google-home buddy-sports ai backup-presence trackers remote-support account terms'
-PRESET_strict_name='Strict'; PRESET_strict_summary='Also turns off casting, phone control and LG Channels, closes the TV to your network and blocks your LG account.'; PRESET_strict_warning=''
-PRESET_lockdown='acr ads adid promos lgchannels diagnostics usage-logs consents hbbtv-tracking voice mic voice-core capture airplay cast phone miracast uei-cloud lan thinq google-home buddy-sports ai backup-presence universal-control trackers store-traffic remote-config remote-support account terms'
+PRESET_strict='acr ads adid promos lgchannels diagnostics usage-logs consents hbbtv-tracking voice mic capture screenshots airplay cast phone dial miracast uei-cloud lan printing thinq google-home buddy-sports ai backup-presence trackers remote-support debugger account terms'
+PRESET_strict_name='Strict'; PRESET_strict_summary='Also turns off casting, phone control and LG Channels, closes the TV to your network and blocks your LG account. Phone apps such as Spotify can cast only to an app already open on the TV.'; PRESET_strict_warning=''
+PRESET_lockdown='acr ads adid promos lgchannels diagnostics usage-logs consents hbbtv-tracking voice mic voice-core capture screenshots airplay cast phone dial miracast uei-cloud lan printing thinq google-home buddy-sports ai backup-presence universal-control trackers store-traffic remote-config remote-support debugger account terms'
 PRESET_lockdown_name='Lockdown'; PRESET_lockdown_summary='Also disables some LG system services. Makes settings slow to open, breaks automatic time / timezone and more.'; PRESET_lockdown_warning='Lockdown is not recommended and may cause unexpected behaviour.'
 OYG_PRESETS='recommended strict lockdown'
 
@@ -375,6 +375,25 @@ OPT_capture_settings_t=''
 OPT_capture_apps=''
 OPT_capture_apps_t=''
 
+# --- screenshots
+OPT_screenshots_category='screen'
+OPT_screenshots_name='Screenshot shield'
+OPT_screenshots_what='Keeps the TV'\''s other screenshots away from apps and phones.'
+OPT_screenshots_breaks='Screenshots from phone remote apps'
+OPT_screenshots_hook='screenshots'
+OPT_screenshots_warning=''
+OPT_screenshots_presets='recommended strict lockdown'; OPT_screenshots_untested=0
+OPT_screenshots_spec=''
+OPT_screenshots_spec_t=''
+OPT_screenshots_released=''
+OPT_screenshots_sdx=''
+OPT_screenshots_hosts=''
+OPT_screenshots_hosts_t=''
+OPT_screenshots_settings=''
+OPT_screenshots_settings_t=''
+OPT_screenshots_apps=''
+OPT_screenshots_apps_t=''
+
 # --- airplay
 OPT_airplay_category='casting'
 OPT_airplay_name='AirPlay'
@@ -426,13 +445,12 @@ OPT_cast_apps_t=''
 OPT_phone_category='casting'
 OPT_phone_name='Phone apps and second screen'
 OPT_phone_what='Stops phones controlling the TV over the network.'
-OPT_phone_breaks='Phone remote apps, launching apps from a phone, LG Link'
+OPT_phone_breaks='Phone remote apps, LG Link'
 OPT_phone_hook='phone'
 OPT_phone_warning=''
 OPT_phone_presets='strict lockdown'; OPT_phone_untested=0
 OPT_phone_spec='
 appcasting|appcasting.service|?|appcasting||com.webos.service.appcasting|L=static
-dial-discovery||/usr/palm/services/com.webos.service.dial/discovery-server.js|||com.webos.service.dial|u,L=unified
 lglink|||||com.webos.service.lglink|u,L=unified
 '
 OPT_phone_spec_t=''
@@ -446,6 +464,27 @@ network|allowMobileDeviceAccess|false
 OPT_phone_settings_t=''
 OPT_phone_apps=''
 OPT_phone_apps_t=''
+
+# --- dial
+OPT_dial_category='casting'
+OPT_dial_name='Phone apps starting TV apps (DIAL)'
+OPT_dial_what='Stops phone apps finding the TV and starting apps on it.'
+OPT_dial_breaks='Casting from a phone app (Spotify, YouTube and others) when its app is not already open on the TV: open it on the TV first'
+OPT_dial_hook='dial'
+OPT_dial_warning=''
+OPT_dial_presets='strict lockdown'; OPT_dial_untested=0
+OPT_dial_spec='
+dial-discovery||/usr/palm/services/com.webos.service.dial/discovery-server.js|||com.webos.service.dial|u,L=unified
+'
+OPT_dial_spec_t=''
+OPT_dial_released=''
+OPT_dial_sdx=''
+OPT_dial_hosts=''
+OPT_dial_hosts_t=''
+OPT_dial_settings=''
+OPT_dial_settings_t=''
+OPT_dial_apps=''
+OPT_dial_apps_t=''
 
 # --- miracast
 OPT_miracast_category='casting'
@@ -507,6 +546,27 @@ OPT_lan_settings=''
 OPT_lan_settings_t=''
 OPT_lan_apps=''
 OPT_lan_apps_t=''
+
+# --- printing
+OPT_printing_category='casting'
+OPT_printing_name='Network printing port'
+OPT_printing_what='Closes the TV'\''s print server (port 515), which takes print jobs from anyone on your network.'
+OPT_printing_breaks=''
+OPT_printing_hook='printing'
+OPT_printing_warning=''
+OPT_printing_presets='recommended strict lockdown'; OPT_printing_untested=0
+OPT_printing_spec='
+lpd|cups-lpd.socket|/usr/libexec/cups/daemon/cups-lpd|cups-lpd|||
+'
+OPT_printing_spec_t=''
+OPT_printing_released=''
+OPT_printing_sdx=''
+OPT_printing_hosts=''
+OPT_printing_hosts_t=''
+OPT_printing_settings=''
+OPT_printing_settings_t=''
+OPT_printing_apps=''
+OPT_printing_apps_t=''
 
 # --- thinq
 OPT_thinq_category='cloud'
@@ -735,6 +795,25 @@ OPT_remote_support_settings_t=''
 OPT_remote_support_apps='com.webos.app.remoteservice com.webos.app.svcdiagnostics com.webos.app.store-demo com.webos.app.sync-demo com.webos.exampleapp.enyoapp.epg com.webos.exampleapp.groupowner com.webos.exampleapp.nav com.webos.exampleapp.qmlapp.client.negative.one com.webos.exampleapp.qmlapp.client.negative.two com.webos.exampleapp.qmlapp.client.positive.one com.webos.exampleapp.qmlapp.client.positive.two com.webos.exampleapp.qmlapp.discover com.webos.exampleapp.qmlapp.epg com.webos.exampleapp.qmlapp.hbbtv com.webos.exampleapp.qmlapp.livetv com.webos.exampleapp.qmlapp.search com.webos.exampleapp.systemui'
 OPT_remote_support_apps_t=''
 
+# --- debugger
+OPT_debugger_category='access'
+OPT_debugger_name='Web-app debugger'
+OPT_debugger_what='Closes the web-app debugger (port 9998) to your network.'
+OPT_debugger_breaks='Opening a web app'\''s DevTools directly from a computer (ares-inspect and ssh -L 9998:localhost:9998 still work)'
+OPT_debugger_hook='debugger'
+OPT_debugger_warning=''
+OPT_debugger_presets='recommended strict lockdown'; OPT_debugger_untested=0
+OPT_debugger_spec=''
+OPT_debugger_spec_t=''
+OPT_debugger_released=''
+OPT_debugger_sdx=''
+OPT_debugger_hosts=''
+OPT_debugger_hosts_t=''
+OPT_debugger_settings=''
+OPT_debugger_settings_t=''
+OPT_debugger_apps=''
+OPT_debugger_apps_t=''
+
 # --- account
 OPT_account_category='access'
 OPT_account_name='Block LG account'
@@ -774,7 +853,7 @@ OPT_terms_apps=''
 OPT_terms_apps_t=''
 
 EULA_IDS='S_VNG S_PRV S_TAD S_TAG S_ADG S_ADC S_ADD S_VDC S_VDD S_NVC S_NVD S_MKT S_DPA S_ALL'
-EULA_FLAGS='acrAllowed acrOnAllowed acrAdAllowed acrGdprAllowed shoppingOnAllowed veranceOnAllowed voiceAllowed voice2Allowed marketingOnAllowed customAdAllowed customadsAllowed thirdPartySharingAllowed remoteDiagAllowed additionalDataAllowed additional1Allowed additional2Allowed additional3Allowed additional4Allowed additional5Allowed cookiesAllowed'
+EULA_FLAGS='acrAllowed acrOnAllowed acrAdAllowed acrGdprAllowed shoppingOnAllowed veranceOnAllowed takeOnAllowed voiceAllowed voice2Allowed marketingOnAllowed customAdAllowed customadsAllowed thirdPartySharingAllowed remoteDiagAllowed additionalDataAllowed additional1Allowed additional2Allowed additional3Allowed additional4Allowed additional5Allowed cookiesAllowed'
 NEVER_HOSTS='lgtvonline.lge.com connectivitycheck.gstatic.com ngfts.lge.com tv.wiselg.com tv.wiselg.cn nextlgsdp.com lgtvsdp.com app.lgwebostv.com snu.lge.com su.lge.com'
 NEVER_HOST_SUFFIXES='-ngfts.lge.com .ngfts.lge.com'
 NEVER_HOST_PREFIXED='tv.wiselg.com tv.wiselg.cn nextlgsdp.com lgtvsdp.com app.lgwebostv.com'

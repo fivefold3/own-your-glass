@@ -31,7 +31,7 @@ account_signout() {  # account_signout [shallow|deep]
 }
 # accountmanager answers the sign-out before it has finished: give it a few
 # seconds to report the account gone
-account_gone() { _ag=0; while [ $_ag -lt 10 ]; do account_signed_in || return 0; sleep 0.5; _ag=$((_ag+1)); done; return 1; }
+account_gone() { _ag=0; while [ $_ag -lt 10 ]; do account_signed_in || return 0; nap 0.5; _ag=$((_ag+1)); done; return 1; }
 # oyg account status|signout|remove: signout keeps the account on the TV
 # (mode shallow, as the TV's own account page does); remove also deletes its
 # stored sign-in from the TV (mode deep)

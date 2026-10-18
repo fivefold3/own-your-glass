@@ -27,8 +27,6 @@ remote_role_paths() {
         | grep -oE '"exeName"[[:space:]]*:[[:space:]]*"(/tmp|/var/tmp|/mnt/lg/cmn_data)/[^"]*"' \
         | sed 's/.*"\(\/[^"]*\)"$/\1/' | sort -u
 }
-# telnet listening on :23 (0017), IPv4 or IPv6
-remote_telnet_listening() { awk 'NR > 1 && $4 == "0A" { split($2, a, ":"); if (a[2] == "0017") f = 1 } END { exit !f }' /proc/net/tcp /proc/net/tcp6 2>/dev/null; }
 
 hook_remote_apply() {
     [ -e "$REMOTE_GATE" ] && warn "$REMOTE_GATE exists: remote support has been provisioned on this TV (left in place, inspect it)"
@@ -74,7 +72,7 @@ hook_remote_restore() {
 hook_remote_status() {
     _r=0; _m=$1
     [ -e "$REMOTE_GATE" ] && { st "$_m" FAIL "remote-debug gate present ($REMOTE_GATE)"; _r=1; }
-    if running telnetd || remote_telnet_listening; then st "$_m" FAIL "a telnet root shell is listening"; _r=1
+    if running telnetd || port_listening 23; then st "$_m" FAIL "a telnet root shell is listening"; _r=1
     elif [ -e "$FAILSAFE_FLAG" ]; then st "$_m" FAIL "Homebrew Channel's failsafe mode is armed: it starts telnet at boot whatever the flag"; _r=1
     elif [ -e "$TELNET_FLAG" ]; then st "$_m" OK "telnet disabled"
     else st "$_m" WARN "telnet flag not set"; _r=1; fi

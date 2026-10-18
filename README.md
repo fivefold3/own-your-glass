@@ -17,12 +17,14 @@ Privacy hardening for rooted LG webOS TVs, packaged as a Homebrew Channel app.
 It stops the parts of the TV that watch you: automatic content recognition
 (ACR), the advertising overlays and ad-ID manager, log and crash uploaders,
 usage and viewing logs, LG remote support, the voice assistants and the
-built-in microphone, the world-readable screen-capture file, LG's cloud and
-smart-home daemons, and the logging and marketing traffic that goes out
-through LG's network gateway. It declines every tracking consent, turns the
-ad and data settings off through LG's own settings service, and hides the ad
+built-in microphone, the world-readable screen-capture file and the
+screenshots the TV keeps for Home and for phone apps, LG's cloud and
+smart-home daemons, the logging and marketing traffic that goes out through
+LG's network gateway, and the debugger and print ports the TV answers to
+anyone on your network. It declines every tracking consent, turns the ad
+and data settings off through LG's own settings service, and hides the ad
 apps from the launcher. Everything is undone by pressing one button or by
-uninstalling the app. If the app is uninstalled, cleans up after itself
+uninstalling the app. If the app is uninstalled, it cleans up after itself,
 leaving no trace after a reboot.
 
 Pick a protection level and press **Own the glass**:
@@ -31,7 +33,8 @@ Pick a protection level and press **Own the glass**:
   phone apps, LG Channels, HbbTV, the Content Store and LG sign-in working.
 - **Strict**: also turns off AirPlay, Google Cast, phone control, Screen
   Share, LG Channels and LG's AI features, closes the TV to your network
-  (SSH included) and blocks your LG account.
+  (SSH included) and blocks your LG account. Phone apps such as Spotify can
+  no longer open their app on the TV: open it on the TV first, then cast.
 - **Lockdown**: also disables some LG system services. Settings gets slow
   to open, and automatic time and time zone, search, Universal Control and
   app installs stop working. Not recommended: the app asks before applying
@@ -72,7 +75,8 @@ it to LG's own launch block list (which also covers the copies that run
 inside app jails), stops its unit and kills what is running. Consents and
 settings go through LG's settings service; LG's gateway is cut off from its
 logging endpoints by rewriting its routing table; hostnames go to nowhere
-through a generated `/etc/hosts`. Every change is recorded per option, so
+through a generated `/etc/hosts`; ports nothing should answer from the
+network are closed by firewall rules. Every change is recorded per option, so
 any option can be undone on its own. A boot hook in
 `/var/lib/webosbrew/init.d` re-applies all of it on every boot, guarded by a
 crash-loop breaker (see [Reboots](#reboots)). If it finds the app has been
@@ -102,14 +106,17 @@ service is in [kb/](kb/).
 | Built-in microphone | ● | ● | ● | Hands-free voice |  |
 | Voice framework and search |  |  | ● | Settings speed, automatic time, time zones, search | Verified on the C5: Settings opens slowly, Date & Time cannot be set automatically, the time-zone list and search results do not load. |
 | **Screen** | | | | | |
-| Screen-capture shield | ● | ● | ● | – | Also blocks a vendor video-plane grabber. |
+| Screen-capture shield | ● | ● | ● | – | OLED care keeps working: the panel service still gets its captures, and status checks that it does. Also blocks a vendor video-plane grabber. |
+| Screenshot shield | ● | ● | ● | Screenshots from phone remote apps | Hides Home's Recents pictures, and the LG account folder they are filed under, from apps; stops paired phone apps asking for a screenshot (a phone connected since start-up keeps it until a restart). Verified on the C5: Recents keeps its pictures, and a paired phone app still connects and controls the TV. |
 | **Casting and phones** | | | | | |
 | AirPlay |  | ● | ● | AirPlay, HomeKit (Siri) | The TV still shows in the AirPlay list, but connecting fails. |
 | Google Cast |  | ● | ● | Google Cast | The TV no longer shows up as a Cast device. |
-| Phone apps and second screen |  | ● | ● | Phone remote apps, launching apps from a phone, LG Link | Turned off again, phone remote apps need a TV restart (LG's phone server starts only with the TV); the app offers one. |
+| Phone apps and second screen |  | ● | ● | Phone remote apps, LG Link | Turned off again, phone remote apps need a TV restart (LG's phone server starts only with the TV); the app offers one. Phone apps starting apps on the TV is the separate DIAL option. |
+| Phone apps starting TV apps (DIAL) |  | ● | ● | Casting from a phone app (Spotify, YouTube and others) when its app is not already open on the TV: open it on the TV first | DIAL lets any device on your network start apps on the TV and turn it off, without asking. Its ports are closed by a firewall rule as well, so the block holds even when DIAL loaded before Own Your Glass at start-up. A computer on the LAN firewall's allow list (oyg lan allow <ip>) still gets through. |
 | Screen Share |  | ● | ● | Screen Share | Also stops the TV's network announcements (avahi), which the Google Home hub uses to find devices. Turned off again, Screen Share needs a TV restart; the app offers one. |
 | Universal Control cloud lookups |  | ● | ● | – | Devices already set up keep working and new ones still set up (C5). |
 | LAN firewall |  | ● | ● | SSH, AirPlay, Google Cast, phone apps, Screen Share, network devices in Universal Control | Replies to connections the TV makes itself (streaming, browsing) still get through. IPv6 is off while it is on (the firewall cannot filter it). `oyg lan allow <ip>` lets a device through, for example your computer for SSH; otherwise turn the firewall off from the app on the TV. |
+| Network printing port | ● | ● | ● | – | Nothing on the TV prints through it. Closed on IPv4 and IPv6 alike. |
 | **LG cloud and smart home** | | | | | |
 | ThinQ and Home Hub | ● | ● | ● | ThinQ app, Home Hub, Matter, LG notifications |  |
 | Google Home hub | ● | ● | ● | Google Home hub |  |
@@ -123,6 +130,7 @@ service is in [kb/](kb/).
 | Remote configuration |  |  | ● | Online programme guide | Also stops Chromecast built-in from starting after a restart (Lockdown turns Cast off anyway). Nothing else was noticed on the C5. |
 | **Remote access and prompts** | | | | | |
 | Remote support and root hygiene | ● | ● | ● | LG remote support | Also keeps Homebrew Channel's telnet root shell off and fixes world-writable root files. |
+| Web-app debugger | ● | ● | ● | Opening a web app's DevTools directly from a computer (ares-inspect and ssh -L 9998:localhost:9998 still work) | The TV always runs it, with no password. Verified on the C5: computers on the network are refused, and it stays reachable from the TV itself. A computer on the LAN firewall's allow list (oyg lan allow <ip>) still gets through. |
 | Block LG account |  | ● | ● | Content Store installs, LG account features | The sign-in screen shows a network error. With no account, LG cannot tie the TV to one and the account terms prompt never appears. |
 | Terms prompts | ● | ● | ● | – | The LG account terms prompt comes with a signed-in account: Block LG account stops it. |
 
@@ -253,12 +261,18 @@ A few changes only finish after a restart, and the app says so (**Restart
 required**, with Restart now or Later):
 
 - turning **Phone apps** off again: LG's phone server starts only with the TV;
+- turning the **Screenshot shield** off where phones can reach the TV: LG's
+  phone service keeps the calls it read with the shield on;
 - turning **Screen Share** off again: Miracast connects again only after a
   restart;
 - showing an app again that an option had hidden (LG Channels): the TV reads
   its hidden-app list only when it starts;
-- JS services that were already loaded when an option blocked them (DIAL,
-  for one) keep running until the next restart.
+- JS services that were already loaded when an option blocked them
+  (ThinQ's `homeconnect`, sports alerts) keep running until the next
+  restart, cut off from LG's cloud (DIAL is firewalled as well, so it is
+  closed either way), and a phone app that used
+  the TV before the Screenshot shield went on keeps the screenshot calls
+  until then (status shows it as blocked, restart to finish).
 
 ## Undo
 
@@ -281,7 +295,7 @@ The toolkit also runs from an SSH shell. Everything the app does is
 ```sh
 oyg status                  # fast, safe to poll
 oyg options                 # every option, and whether it is on
-oyg preset strict           # choose recommended, strict or custom, and apply it
+oyg preset strict           # choose recommended, strict, lockdown or custom, and apply it
 oyg set hbbtv=on voice=off  # change your Custom selection and apply it
 oyg apply                   # apply the current selection again
 oyg restore [option...]     # undo (everything, or the named options)
